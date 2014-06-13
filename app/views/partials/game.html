@@ -1,0 +1,51 @@
+<div ng-if="user.authenticated">
+	<p>Hello <strong>{{user.name}}</strong>.  Give your friends game code <strong>{{game.id}}</strong> to join this game.</p>
+	<h2>Players currently in the game</h2>
+	<ul>
+		<li ng-repeat="player in game.players">{{player.name}}</li>
+	</ul>
+	<h2>Game is {{game.isStarted ? '' : 'not'}} started.</h2>
+	<h2 ng-if="scores">Scores: <span ng-repeat="score in scores">{{score.name}}: {{score.score}} </span></h2>
+	<button ng-if="game.canStart && !game.isStarted" ng-click="requestGameStart()">Start the Game!</button>
+	<div ng-if="game.isStarted">
+		<h3><strong>{{game.playerTurn.name}}</strong>'s turn to pick</h3>
+		<h3><strong>{{game.question.type}}: {{game.question.value}}</strong></h3>
+		<h3 ng-if="game.answer"><strong>{{game.answer.card.value}} ({{game.answer.winner.name}})</strong></h3>
+		<h3 ng-if="waitingOnPlayers > 0">Waiting for {{waitingOnPlayers}} player(s) to submit a card</h3>
+		<h3 ng-if="waitingForChooser">Waiting for {{game.playerTurn.name}} to choose a card</h3>
+		<button ng-if="startNextRound" ng-click="requestStartNextRound()">Start the Next Round</button>
+		<div ng-if="!cardsToChoose">
+			<h2>Your cards</h2>
+			<form>
+			  <div class="form-group" ng-form="playerCards" ng-repeat="card in user.gameObj.hand track by $index">
+			    <div class="radio">
+			      <label>
+			        <input type="radio" name="selection" value="{{card}}" ng-model="user.gameObj.selection" ng-disabled="!(submitACard)">
+			        <span>{{card.value}}</span>
+			      </label>
+			    </div>
+			  </div>
+			</form>
+			<button ng-if="submitACard" ng-click="submitCard(user.gameObj.selection)">Submit Card</button>
+		</div>
+
+		<div ng-if="cardsToChoose">
+			<h2>Choose the best card!</h2>
+			<form>
+			  <div class="form-group" ng-form="answerCardChoices" ng-repeat="card in cardsToChoose track by $index">
+			    <div class="radio">
+			      <label>
+			        <input type="radio" name="selection" value="{{card}}" ng-model="user.gameObj.answerSelection">
+			        <span>{{card.value}}</span>
+			      </label>
+			    </div>
+			  </div>
+			</form>
+			<button ng-click="chooseAnswer(user.gameObj.answerSelection)">Submit</button>
+		</div>
+
+	</div>
+</div>
+<div ng-if="!user.authenticated">
+	<p>Hello, you have not authenticated.  You are being re-directed to the login page.</p>
+</div>
