@@ -1,16 +1,16 @@
-<div ng-if="!user.authenticated">
+<div ng-if="!(gameService.user.authenticated)">
   <h2 >Hello, you have not yet registered.  Please sign in.</h2>
   <form novalidate name="signinform">
     <input type="text" placeholder="What is your name?" required ng-model="user.name"/><br/>
-    <button ng-click="signin(user)" ng-disabled="signinform.$invalid">Sign in!</button>
+    <button ng-click="signIn(user)" ng-disabled="signinform.$invalid">Sign in!</button>
   </form>
 </div>
-<div ng-if="user.authenticated">
-  <h2 >Hello {{user.name}}, are you ready to play?</h2>
-  <button ng-click="startGame(user)">Start a new game</button>
+<div ng-if="gameService.user.authenticated">
+  <h2 >Hello {{gameService.user.name}}, are you ready to play?</h2>
+  <button ng-click="startGame()">Start a new game</button>
   <p>Join an existing game</p>
   <form novalidate name="joinform">
-    <input type="text" required ng-model="joinGameId"/>
-    <button ng-click="joinGame(user, joinGameId)" ng-disabled="joinform.$invalid">Join!</button>
+    <input type="text" required ng-model="join.gameId"/>
+    <button ng-click="joinGame(join)" ng-disabled="joinform.$invalid">Join!</button>
   </form>
 </div>
