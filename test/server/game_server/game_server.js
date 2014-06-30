@@ -1,6 +1,7 @@
 var should = require('should');
 var io = require('socket.io-client');
 var assert = require('assert');
+var async = require('async');
 
 var socketURL = 'ws://localhost:9000';
 
@@ -24,6 +25,23 @@ var connectToServer = function(callback) {
   });
 };
 
+var connectToServer2 = function(callback, listeners) {
+  var client = io.connect(socketURL, options);
+
+  client.on('connect', function(data){
+    // add passed in listeners
+    for (var eventName in listeners) {
+      client.on(eventName, listeners[eventName]);
+    }
+
+    if (typeof callback == 'function') {
+      callback(client);
+    }
+  });
+};
+
+
+
 var signIn = function(clientName, callback) {
   var signInCallback = function(client) {
     client.emit('signIn', clientName);
@@ -40,6 +58,30 @@ var signIn = function(clientName, callback) {
 
   connectToServer(signInCallback);
 };
+
+
+
+var signIn2 = function(clientName, callback, listeners) {
+  listeners = listeners || {};
+
+  var signInCallback = function(client) {
+    client.emit('signIn', clientName);
+
+    client.on('signInConfirm', function(data) {
+      var myUser = data;
+
+      // call the provided function
+      if (typeof callback == 'function') {
+        callback(client, myUser);
+      }
+    });
+  };
+
+  listeners['signInConfirm'] = signInCallback;
+
+  connectToServer(signInCallback, listeners);
+};
+
 
 var joinGame = function(user, gameId, joinCallback, updateCallback) {
   var joinGameCallback = function(client, userInfo) {
@@ -87,8 +129,118 @@ var createGame = function(clientName, createCallback, updateCallback, gameCanSta
   signIn(clientName, createGameCallback);
 };
 
+var signInMaker = function(user) {
+  return function(callback) {
+    var client = io.connect(socketURL, options);
+    client.emit('signIn', user);
+
+    client.on('signInConfirm', function(data) {
+      callback(null, client, data);
+    });
+  };
+};
+
+var joinGameMaker = function(user, clientListeners) {
+  return function(client, userInfo, callbackData, callback) {
+    
+    async.waterfall([
+      signInMaker(user),
+      function(chainClient, chainUserInfo, chainCallback) {
+        for (var key in clientListeners) {
+          if (typeof clientListeners[key] == 'function') {
+            // wrap the call within a closure to protect the iterator variable!
+            (function(myKey) {
+              chainClient.on(myKey, function(data) {
+                clientListeners[myKey](chainClient, userInfo, data, callbackData, myKey);
+              });  
+            })(key);
+          }
+        }
+        chainClient.emit('requestJoin', {gameId: callbackData['startConfirm'].id});
+        chainCallback(null, chainClient, chainUserInfo, callbackData);
+      }
+      ], 
+    function(err, client, userInfo, callbackData) {
+      callback(null, client, userInfo, callbackData);
+    });
+  }
+};
+
+
+var requestStartMaker = function(clientListeners) {
+  return function(client, userInfo, callback) {
+    var callbackData = {};
+
+    for (var key in clientListeners) {
+      if (typeof clientListeners[key] == 'function') {
+        // wrap the call within a closure to protect the iterator variable!
+        (function(myKey) {
+          client.on(myKey, function(data) {
+            clientListeners[myKey](client, userInfo, data, callbackData, myKey);
+          });  
+        })(key);  
+      }
+    }
+
+    client.emit('requestStart', userInfo);
+    callback(null, client, userInfo, callbackData);
+  };
+};
+
+var createGameMaker = function(user, clientListeners) {
+  return function(callback) {
+    async.waterfall([
+      signInMaker(user),
+      requestStartMaker(clientListeners)
+      ], 
+    function(err, client, userInfo, callbackData) {
+      callback(null, client, userInfo, callbackData);
+    });
+  };
+};
+
+var storeData = function(client, userInfo, data, callbackData, key) {
+  callbackData[key] = data;
+};
+
+var startConfirmDefault = function(client, userInfo, data, callbackData, key) {
+  callbackData[key] = data;
+  callbackData['connections'] = [];
+  callbackData['connections'].push(client);
+};
+
+var joinConfirmDefault = function(client, userInfo, data, callbackData, key) {
+  callbackData['connections'].push(client);
+};
+
 describe("Game Server",function(){
-  
+
+  it('should sign in on connection (async)', function(done) {
+    async.waterfall([
+      signInMaker(user1)
+      ], 
+    function(err, client, userInfo) {
+      // client id should be the socket id
+      assert.equal(client.io.engine.id, userInfo.socketId);
+
+      // userInfo.authenticated should be true on successful signin
+      assert.equal(userInfo.authenticated, true);
+
+      // userInfo.id should be a 10 character unique id
+      assert.equal(userInfo.id.length, 10);
+
+      // userInfo.gameObj should be a game object
+      assert.equal(typeof userInfo.gameObj, 'object');
+
+      // gameId should initially be 0
+      assert.equal(userInfo.gameId, 0);
+
+      client.disconnect();
+      done();
+    });
+  });
+
+/*
   it('should sign in on connection', function(done) {
     var cb = function(client, userInfo) {
       // client id should be the socket id
@@ -112,7 +264,29 @@ describe("Game Server",function(){
 
     signIn(user1, cb);
   });
+*/
 
+  it('should fail to create a game when not authenticated (async)', function(done) {
+    async.waterfall([
+      function(callback) {
+        var client = io.connect(socketURL, options);
+        client.emit('requestStart', user1);
+
+        client.on('startReject', function(data) {
+          callback(null, client, data);
+        });
+      }
+      ], 
+    function(err, client, data) {
+      // data should contain an error message
+      assert.equal(data.error, 'User not authenticated.');
+
+      client.disconnect();
+      done();
+    });
+  });
+
+/*
   it('should fail to create a game when not authenticated', function(done) {
     var startNoAuthCallback = function(client) {
       client.emit('requestStart', user1);
@@ -128,7 +302,30 @@ describe("Game Server",function(){
 
     connectToServer(startNoAuthCallback);
   });
+*/
 
+  it('should fail to join a game when not authenticated (async)', function(done) {
+    async.waterfall([
+      function(callback) {
+        var client = io.connect(socketURL, options);
+        client.emit('requestJoin', {user: user1, gameId: 'asdf'});
+
+        client.on('joinReject', function(data) {
+          callback(data, client);
+        });
+      }
+      ], 
+    function(err, client) {
+      // data should contain an error message
+      assert.equal(err.error, 'User not authenticated.');
+
+      client.disconnect();
+      done();
+    });
+  });
+
+
+/*
   it('should fail to join a game when not authenticated', function(done) {
     var joinNoAuthCallback = function(client) {
       client.emit('requestJoin', {user: user1, gameId: 'asdf'});
@@ -144,7 +341,34 @@ describe("Game Server",function(){
 
     connectToServer(joinNoAuthCallback);
   });
+*/
 
+  it('should fail to join a game whose id does not exist (async)', function(done) {
+    async.waterfall([
+      signInMaker(user1),
+      function(client, userInfo, callback) {
+        client.emit('requestJoin', {user: user1, gameId: 'asdf'});
+
+        client.on('joinReject', function(data) {
+          callback(data, client);
+        });
+      }
+      ], 
+    function(err, client) {
+      try {
+        assert.equal(err.error, 'Game not found.');  
+      } catch(e) {
+        client.disconnect();
+        done(e);
+        return;
+      }
+      
+      client.disconnect();
+      done();
+    });
+  });
+
+/*
   it('should fail to join a game whose id does not exist', function(done) {
     var joinNoGameIdCallback = function(client, userInfo) {
       client.emit('requestJoin', {user: userInfo, gameId: 'asdf'});
@@ -160,7 +384,59 @@ describe("Game Server",function(){
 
     signIn(user1, joinNoGameIdCallback);
   });
+*/
 
+  it('should be able to create a game (async)', function(done) {
+    // verify the data from both callbacks
+    var onFinish = function(client, callbackData) {
+      if (callbackData['startConfirm'] && callbackData['playerUpdate']) {
+        client.disconnect();
+        done();
+      }
+    };
+    var onError = function(client, error) {
+      client.disconnect();
+      done(error);
+    };
+
+    var listeners = {
+      'startConfirm': function(client, userInfo, data, callbackData, key) {
+        try {
+          assert.equal(data.id.length, 5);
+          assert.equal(data.players.length, 1);
+          assert.equal(data.players[0].name, user1.name);
+        } catch(e) {
+          onError(client, e);
+          return;
+        }
+
+        // set callback data for this handler
+        callbackData[key] = data;
+        onFinish(client, callbackData);
+      },
+      'playerUpdate': function(client, userInfo, data, callbackData, key) {
+        try {
+          assert.equal(data.players.length, 1);
+          assert.equal(data.players[0].name, user1.name);
+        } catch(e) {
+          onError(client, e);
+          return;
+        }
+
+        // set callback data for this handler
+        callbackData[key] = data;
+        onFinish(client, callbackData);
+      }
+    };
+
+    async.waterfall([
+      createGameMaker(user1, listeners)
+      ], 
+    function(err, client, userInfo, callbackData) {
+    });
+  });
+
+/*
   it('should be able to create a game', function(done) {
     var createCallback = function(client, userInfo, gameInfo) {
       // data: {id: newGame.id, players: server.getBasicPlayerInfo(newGame.id)}
@@ -178,7 +454,74 @@ describe("Game Server",function(){
 
     createGame(user1, createCallback, playerUpdateCallback);
   });
+*/
 
+  it('should be able to join a game (async)', function(done) {
+    var playerUpdates = 0;
+    var onFinish = function(client, callbackData) {
+      // disconnect all clients
+      callbackData['connections'].forEach(function(cl) {
+        cl.disconnect();
+      });
+      client.disconnect();
+      done();
+    };
+    var onError = function(client, callbackData, error) {
+      // disconnect all clients
+      callbackData['connections'].forEach(function(cl) {
+        cl.disconnect();
+      });
+      client.disconnect();
+
+      done(error);
+    };
+
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': function(client, userInfo, data, callbackData, key) {
+        try {
+          assert.equal(data.players.length, 2);
+          assert.equal(data.players[0].name, user1.name);
+          assert.equal(data.players[1].name, user2.name);
+        } catch(e) {
+          onError(client, callbackData, e);
+          return;
+        }
+
+        callbackData['joinConfirm'] = data;
+      },
+      'playerUpdate': function(client, userInfo, data, callbackData, key) {
+        playerUpdates++;
+
+        try {
+          if (playerUpdates == 1) {
+            assert.equal(data.players.length, 1);
+            assert.equal(data.players[0].name, user1.name);
+          }
+
+          if (playerUpdates == 2 && callbackData['joinConfirm']) {
+            assert.equal(data.players.length, 2);
+            assert.equal(data.players[0].name, user1.name);
+            assert.equal(data.players[1].name, user2.name);
+
+            onFinish(client, callbackData);
+          }  
+        } catch(e) {
+          onError(client, callbackData, e);
+          return;
+        }
+      }
+    };
+
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners)
+      ], 
+    function(err, client, userInfo, callbackData) {   
+    });
+  });
+
+/*
   it('should be able to join a game', function(done) {
     var client2joined = false;
 
@@ -229,7 +572,42 @@ describe("Game Server",function(){
 
     createGame(user1, createCallback, user1UpdateCallback);
   });
+*/
 
+
+  it('should alert player 1 when the game may be started (async)', function(done) {
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': joinConfirmDefault,
+      'gameCanStart': function(client, userInfo, data, callbackData, key) {
+        try {
+          assert.equal(data.id.length, 5);
+          assert.equal(data.players.length > 2, true);
+        } catch(e) {
+          callbackData['connections'].forEach(function(cl) {
+            cl.disconnect();
+          })
+          done(e);
+          return;
+        }
+
+        callbackData['connections'].forEach(function(cl) {
+          cl.disconnect();
+        })
+        done();
+      }
+    };
+
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners),
+      joinGameMaker(user3, listeners)
+      ], 
+    function(err, client, userInfo, callbackData) {   
+    });
+  });
+
+/*
   it('should alert player 1 when the game may be started', function(done) {
     var clientsConnected = [];
 
@@ -260,6 +638,7 @@ describe("Game Server",function(){
 
     createGame(user1, createCallback, null, gameCanStartCallback);
   });
+*/
 
 /*
   it('should let 50 users connect to the same game', function(done) {
