@@ -1351,105 +1351,72 @@ describe("Game Server",function(){
   });
 
 
-
-  it('should prevent other players from starting a new round', function(done) {
-    var clientsConnected = [];
+  it('should prevent other players from starting a new round (async)', function(done) {
     var numWaitingForCards = 0;
-    var firstClient;
-    
-    var usersToAnswer = [];
-    var clientToChoose;
+    var numShown = 0;
 
-    var startNextRoundPromptCallback = function(data) {
-      // data: null
-      clientToChoose.emit('requestStartNextRound', null);
+    var onFinish = function(callbackData) {
+      callbackData['connections'].forEach(function(cl) {
+        cl.client.disconnect();
+      });
     };
 
-    var startNextRoundRejectCallback = function(data) {
-      assert.equal(data.error, 'Only the player whose turn is currently active may request a new round.');
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': joinConfirmDefault,
+      'gameCanStart': gameCanStartDefault,
+      'yourTurnToChoose': yourTurnToChooseDefault,
+      'yourTurnToAnswer': yourTurnToAnswerDefault,
+      'cardDrawn': cardDrawnDefault,
+      'waitingForCards': function(client, userInfo, data, callbackData, key) {
+        // data: { numPlayers: 2 }
+        numWaitingForCards++;
 
-      for (var key in clientsConnected) {
-        // cleanup and end
-        clientsConnected[key].client.disconnect();      
-      }
-      
-      done();
-    };
+        // wait until all 3 get the initial callback
+        if (numWaitingForCards >= 3) {
+          // submit the cards
+          if (data.numPlayers === 2) {
+            
+            var client1 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][0])];
+            var client2 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][1])];
 
-    var yourTurnToChooseCallback = function(data) {
-      var client = this;
-      clientToChoose = client;
-    };
-
-    var chooseCardCallback = function(data) {
-      clientToChoose.emit('chooseAnswer', {card: data.cards[0]});
-    };
-
-    var yourTurnToAnswerCallback = function(data) {
-      var client = this;
-      usersToAnswer.push(client);
-    };
-
-    var cardDrawnCallback = function(data) {
-      // { type: 'Answer', value: 'A disappointing birthday party.' }
-      var client = this;
-      clientsConnected[client.io.engine.id].cards.push(data);
-    };
-
-    var waitingForCardsCallback = function(data) {
-      // { numPlayers: 2 }
-      numWaitingForCards++;
-
-      // wait until all 3 get the initial callback
-      if (numWaitingForCards >= 3) {
-        // submit the cards
-        if (data.numPlayers === 2 && !(usersToAnswer[0].answered)) {
-          usersToAnswer[0].emit('submitCardRequest', {card: clientsConnected[usersToAnswer[0].io.engine.id].cards[0]});
-          usersToAnswer[0].answered = true;
+            client1.client.emit('submitCardRequest', {card: client1.cards[0]});
+            client2.client.emit('submitCardRequest', {card: client2.cards[0]});
+          }
         }
-        if (data.numPlayers === 1 && !(usersToAnswer[1].answered)) {
-          usersToAnswer[1].emit('submitCardRequest', {card: clientsConnected[usersToAnswer[1].io.engine.id].cards[0]});
-          usersToAnswer[1].answered = true;
+      },
+      'chooseCard': function(client, userInfo, data, callbackData, key) {
+        // data: { cards: [ { type: 'Answer', value: 'My manservant, Claude.' }, { type: 'Answer', value: 'That thing that electrocutes your abs.' } ] }
+        client.emit('chooseAnswer', {card: data.cards[0]});
+      },
+      'startNextRoundPrompt': function(client, userInfo, data, callbackData, key) {
+        var client1 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToChoose'])];
+        client1.client.emit('requestStartNextRound', null);
+      },
+      'startNextRoundReject': function(client, userInfo, data, callbackData, key) {
+        try {
+          assert.equal(data.error, 'Only the player whose turn is currently active may request a new round.');  
+        } catch(e) {
+          onFinish(callbackData);
+          done(e);
+          return;          
         }
+        
+        onFinish(callbackData);
+        done();
       }
     };
 
-    var createCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      firstClient = client;
-
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('yourTurnToChoose', yourTurnToChooseCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-      client.on('chooseCard', chooseCardCallback);
-      client.on('startNextRoundPrompt', startNextRoundPromptCallback);
-      client.on('startNextRoundReject', startNextRoundRejectCallback);
-
-      joinGame(user2, gameInfo.id, joinCallback, null);
-      joinGame(user3, gameInfo.id, joinCallback, null);
-    };
-
-    var joinCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('yourTurnToChoose', yourTurnToChooseCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-      client.on('chooseCard', chooseCardCallback);
-      client.on('startNextRoundPrompt', startNextRoundPromptCallback);
-      client.on('startNextRoundReject', startNextRoundRejectCallback);
-
-      if (Object.keys(clientsConnected).length == 3) {
-        firstClient.emit('requestGameStart', {});
-      }
-    }
-
-    createGame(user1, createCallback, null, null);
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners),
+      joinGameMaker(user3, listeners),
+      ], 
+    function(err, client, userInfo, callbackData) {
+    });
   });
+
+
 
   it('should allow the active player to start a new round when the game is ready', function(done) {
     var clientsConnected = [];
