@@ -25,23 +25,6 @@ var connectToServer = function(callback) {
   });
 };
 
-var connectToServer2 = function(callback, listeners) {
-  var client = io.connect(socketURL, options);
-
-  client.on('connect', function(data){
-    // add passed in listeners
-    for (var eventName in listeners) {
-      client.on(eventName, listeners[eventName]);
-    }
-
-    if (typeof callback == 'function') {
-      callback(client);
-    }
-  });
-};
-
-
-
 var signIn = function(clientName, callback) {
   var signInCallback = function(client) {
     client.emit('signIn', clientName);
@@ -58,30 +41,6 @@ var signIn = function(clientName, callback) {
 
   connectToServer(signInCallback);
 };
-
-
-
-var signIn2 = function(clientName, callback, listeners) {
-  listeners = listeners || {};
-
-  var signInCallback = function(client) {
-    client.emit('signIn', clientName);
-
-    client.on('signInConfirm', function(data) {
-      var myUser = data;
-
-      // call the provided function
-      if (typeof callback == 'function') {
-        callback(client, myUser);
-      }
-    });
-  };
-
-  listeners['signInConfirm'] = signInCallback;
-
-  connectToServer(signInCallback, listeners);
-};
-
 
 var joinGame = function(user, gameId, joinCallback, updateCallback) {
   var joinGameCallback = function(client, userInfo) {
@@ -129,6 +88,8 @@ var createGame = function(clientName, createCallback, updateCallback, gameCanSta
   signIn(clientName, createGameCallback);
 };
 
+
+// ASYNC HELPER METHODS
 var signInMaker = function(user) {
   return function(callback) {
     var client = io.connect(socketURL, options);
@@ -142,7 +103,6 @@ var signInMaker = function(user) {
 
 var joinGameMaker = function(user, clientListeners) {
   return function(client, userInfo, callbackData, callback) {
-    
     async.waterfall([
       signInMaker(user),
       function(chainClient, chainUserInfo, chainCallback) {
@@ -151,11 +111,12 @@ var joinGameMaker = function(user, clientListeners) {
             // wrap the call within a closure to protect the iterator variable!
             (function(myKey) {
               chainClient.on(myKey, function(data) {
-                clientListeners[myKey](chainClient, userInfo, data, callbackData, myKey);
+                clientListeners[myKey](chainClient, chainUserInfo, data, callbackData, myKey);
               });  
             })(key);
           }
         }
+
         chainClient.emit('requestJoin', {gameId: callbackData['startConfirm'].id});
         chainCallback(null, chainClient, chainUserInfo, callbackData);
       }
@@ -163,9 +124,8 @@ var joinGameMaker = function(user, clientListeners) {
     function(err, client, userInfo, callbackData) {
       callback(null, client, userInfo, callbackData);
     });
-  }
+  };
 };
-
 
 var requestStartMaker = function(clientListeners) {
   return function(client, userInfo, callback) {
@@ -206,11 +166,45 @@ var storeData = function(client, userInfo, data, callbackData, key) {
 var startConfirmDefault = function(client, userInfo, data, callbackData, key) {
   callbackData[key] = data;
   callbackData['connections'] = [];
-  callbackData['connections'].push(client);
+  callbackData['connections'].push({client: client, userInfo: userInfo});
 };
 
 var joinConfirmDefault = function(client, userInfo, data, callbackData, key) {
-  callbackData['connections'].push(client);
+  callbackData['connections'].push({client: client, userInfo: userInfo});
+};
+
+var gameCanStartDefault = function(client, userInfo, data, callbackData, key) {
+  callbackData['connections'][0].client.emit('requestGameStart', {});
+};
+
+var yourTurnToChooseDefault = function(client, userInfo, data, callbackData, key) {
+  callbackData[key] = client;
+};
+
+var yourTurnToAnswerDefault = function(client, userInfo, data, callbackData, key) {
+  callbackData[key] = callbackData[key] || [];
+  callbackData[key].push(client);
+};
+
+var cardDrawnDefault = function(client, userInfo, data, callbackData, key) {
+  var index = findConnection(callbackData, client);
+  callbackData['connections'][index].cards = callbackData['connections'][index].cards || [];
+  callbackData['connections'][index].cards.push(data);
+};
+
+var disconnectAll = function(callbackData) {
+  callbackData['connections'].forEach(function(cl) {
+    cl.client.disconnect();
+  });
+};
+
+var findConnection = function(callbackData, client) {
+  for (var i = 0; i < callbackData['connections'].length; i++) {
+    if (callbackData['connections'][i].client === client) {
+      return i;
+    }
+  }
+  return -1;
 };
 
 describe("Game Server",function(){
@@ -240,32 +234,6 @@ describe("Game Server",function(){
     });
   });
 
-/*
-  it('should sign in on connection', function(done) {
-    var cb = function(client, userInfo) {
-      // client id should be the socket id
-      assert.equal(client.io.engine.id, userInfo.socketId);
-
-      // userInfo.authenticated should be true on successful signin
-      assert.equal(userInfo.authenticated, true);
-
-      // userInfo.id should be a 10 character unique id
-      assert.equal(userInfo.id.length, 10);
-
-      // userInfo.gameObj should be a game object
-      assert.equal(typeof userInfo.gameObj, 'object');
-
-      // gameId should initially be 0
-      assert.equal(userInfo.gameId, 0);
-
-      client.disconnect();
-      done();
-    };
-
-    signIn(user1, cb);
-  });
-*/
-
   it('should fail to create a game when not authenticated (async)', function(done) {
     async.waterfall([
       function(callback) {
@@ -286,24 +254,6 @@ describe("Game Server",function(){
     });
   });
 
-/*
-  it('should fail to create a game when not authenticated', function(done) {
-    var startNoAuthCallback = function(client) {
-      client.emit('requestStart', user1);
-
-      client.on('startReject', function(data) {
-        // data should contain an error message
-        assert.equal(data.error, 'User not authenticated.');
-
-        client.disconnect();
-        done();
-      });
-    };
-
-    connectToServer(startNoAuthCallback);
-  });
-*/
-
   it('should fail to join a game when not authenticated (async)', function(done) {
     async.waterfall([
       function(callback) {
@@ -323,25 +273,6 @@ describe("Game Server",function(){
       done();
     });
   });
-
-
-/*
-  it('should fail to join a game when not authenticated', function(done) {
-    var joinNoAuthCallback = function(client) {
-      client.emit('requestJoin', {user: user1, gameId: 'asdf'});
-
-      client.on('joinReject', function(data) {
-        // data should contain an error message
-        assert.equal(data.error, 'User not authenticated.');
-
-        client.disconnect();
-        done();
-      });
-    };
-
-    connectToServer(joinNoAuthCallback);
-  });
-*/
 
   it('should fail to join a game whose id does not exist (async)', function(done) {
     async.waterfall([
@@ -367,24 +298,6 @@ describe("Game Server",function(){
       done();
     });
   });
-
-/*
-  it('should fail to join a game whose id does not exist', function(done) {
-    var joinNoGameIdCallback = function(client, userInfo) {
-      client.emit('requestJoin', {user: userInfo, gameId: 'asdf'});
-
-      client.on('joinReject', function(data) {
-        // data should contain an error message
-        assert.equal(data.error, 'Game not found.');
-
-        client.disconnect();
-        done();
-      });
-    };
-
-    signIn(user1, joinNoGameIdCallback);
-  });
-*/
 
   it('should be able to create a game (async)', function(done) {
     // verify the data from both callbacks
@@ -436,32 +349,12 @@ describe("Game Server",function(){
     });
   });
 
-/*
-  it('should be able to create a game', function(done) {
-    var createCallback = function(client, userInfo, gameInfo) {
-      // data: {id: newGame.id, players: server.getBasicPlayerInfo(newGame.id)}
-      assert.equal(gameInfo.id.length, 5);
-      assert.equal(gameInfo.players.length, 1);
-      assert.equal(gameInfo.players[0].name, user1.name); 
-    };
-    var playerUpdateCallback = function(client, userInfo, update) {
-      assert.equal(update.players.length, 1);
-      assert.equal(update.players[0].name, user1.name);
-
-      client.disconnect();
-      done();
-    };
-
-    createGame(user1, createCallback, playerUpdateCallback);
-  });
-*/
-
   it('should be able to join a game (async)', function(done) {
     var playerUpdates = 0;
     var onFinish = function(client, callbackData) {
       // disconnect all clients
       callbackData['connections'].forEach(function(cl) {
-        cl.disconnect();
+        cl.client.disconnect();
       });
       client.disconnect();
       done();
@@ -469,7 +362,7 @@ describe("Game Server",function(){
     var onError = function(client, callbackData, error) {
       // disconnect all clients
       callbackData['connections'].forEach(function(cl) {
-        cl.disconnect();
+        cl.client.disconnect();
       });
       client.disconnect();
 
@@ -521,60 +414,6 @@ describe("Game Server",function(){
     });
   });
 
-/*
-  it('should be able to join a game', function(done) {
-    var client2joined = false;
-
-    var joinCallback = function(client, userInfo, data) {
-      // data: { id: 'visdg', players: [ { name: 'u1', id: 'vJgUcyPNSH' },{ name: 'u2', id: 'u2lwOyb8VG' } ] }
-      assert.equal(data.players.length, 2);
-      assert.equal(data.players[0].name, user1.name);
-      assert.equal(data.players[1].name, user2.name);
-
-      // set the client2joined flag to be true since both users have joined
-      client2joined = true;
-    };
-
-    var joinUpdateCallback = function(client, userInfo, update) {
-      assert.equal(update.players.length, 2);
-      assert.equal(update.players[0].name, user1.name);
-      assert.equal(update.players[1].name, user2.name);
-
-      // client2 disconnects first
-      client.disconnect();
-    };
-
-    var user1UpdateCallback = function(client, userInfo, update) {      
-      // on the update when client2 initially joins the game
-      if (update.players.length == 1 && !client2joined) {
-        assert.equal(update.players.length, 1);
-        assert.equal(update.players[0].name, user1.name);
-      }
-
-      // on the update where client2 has joined
-      if (update.players.length == 2 && client2joined) {
-        assert.equal(update.players.length, 2);
-        assert.equal(update.players[0].name, user1.name);
-        assert.equal(update.players[1].name, user2.name);
-      }
-
-      // on the update where client2 has disconnected, disconnect client1 and end the test case
-      if (update.players.length == 1 && client2joined) {
-        // disconnect client1
-        client.disconnect();
-        done();
-      }
-    };
-
-    var createCallback = function(client, userInfo, gameInfo) {
-      joinGame(user2, gameInfo.id, joinCallback, joinUpdateCallback);
-    };
-
-    createGame(user1, createCallback, user1UpdateCallback);
-  });
-*/
-
-
   it('should alert player 1 when the game may be started (async)', function(done) {
     var listeners = {
       'startConfirm': startConfirmDefault,
@@ -584,16 +423,12 @@ describe("Game Server",function(){
           assert.equal(data.id.length, 5);
           assert.equal(data.players.length > 2, true);
         } catch(e) {
-          callbackData['connections'].forEach(function(cl) {
-            cl.disconnect();
-          })
+          disconnectAll(callbackData);
           done(e);
           return;
         }
 
-        callbackData['connections'].forEach(function(cl) {
-          cl.disconnect();
-        })
+        disconnectAll(callbackData);
         done();
       }
     };
@@ -606,39 +441,6 @@ describe("Game Server",function(){
     function(err, client, userInfo, callbackData) {   
     });
   });
-
-/*
-  it('should alert player 1 when the game may be started', function(done) {
-    var clientsConnected = [];
-
-    var createCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected.push({client: client, user: userInfo});
-
-      joinGame(user2, gameInfo.id, joinCallback, null);
-      joinGame(user3, gameInfo.id, joinCallback, null);
-    };
-
-    var joinCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected.push({client: client, user: userInfo});
-    }
-
-    var gameCanStartCallback = function(client, userInfo, data) {
-      assert(data.id.length, 5);
-      assert(data.players.length > 2, true);
-
-      // disconnect everyone and end the test
-      clientsConnected.forEach(function(c) {
-        c.client.disconnect();
-      });
-      
-      done();
-    };
-
-    createGame(user1, createCallback, null, gameCanStartCallback);
-  });
-*/
 
 /*
   it('should let 50 users connect to the same game', function(done) {
@@ -674,1019 +476,881 @@ describe("Game Server",function(){
   });
 */
 
-  it('should not allow game to start when provided an invalid gameid', function(done) {
-    var cb = function(client, userInfo) {
-      client.emit('requestGameStart', {user: userInfo, gameId: '123'});
+  it('should not allow game to start when provided an invalid gameid (async)', function(done) {
+    async.waterfall([
+      signInMaker(user1),
+      function(client, data, callback) {
+        client.emit('requestGameStart', {});
 
-      client.on('gameStartReject', function(data) {
+        client.on('gameStartReject', function(data) {
+          callback(null, data, client);
+        });
+      }
+      ], 
+    function(err, data, client) {
+      try {
         assert.equal(data.error, 'Game not found.');
-
+      } catch(e) {
         client.disconnect();
-        done();
-      });
-    };
-
-    signIn(user1, cb);
+        done(e);
+        return;
+      }
+      client.disconnect();
+      done();
+    });
   });
 
-  it('should not allow game to start when requested by an un-authenticated user', function(done) {
-    var cb = function(client, userInfo) {
-      client.emit('requestGameStart', {user: user1, gameId: '123'});
+  it('should not allow game to start when requested by an un-authenticated user (async)', function(done) {
+    var client = io.connect(socketURL, options);
+    client.emit('requestGameStart', {user: user1, gameId: '123'});
 
-      client.on('gameStartReject', function(data) {
+    client.on('gameStartReject', function(data) {
+      try {
         assert.equal(data.error, 'User not found.');
-
+      } catch(e) {
         client.disconnect();
-        done();
-      });
-    };
-
-    connectToServer(cb);
-  });
-
-  it('should not allow game to start when there are less than 3 players connected', function(done) {
-    var clientsConnected = [];
-
-    var createCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected.push({client: client, user: userInfo});
-
-      // receive the reject message
-      client.on('gameStartReject', function(data) {
-        assert.equal(data.error, 'Game must have at least three players to start.');
-
-        // disconnect everyone and end the test
-        clientsConnected.forEach(function(c) {
-          c.client.disconnect();
-        });
-        
-        done();
-      });
-
-      joinGame(user2, gameInfo.id, joinCallback, null);
-    };
-
-    var joinCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected.push({client: client, user: userInfo});
-
-      if (clientsConnected.length == 2) {
-        clientsConnected[0].client.emit('requestGameStart', {user: clientsConnected[0].user, gameId: gameInfo.id});
+        done(e);
+        return;
       }
-    }
-
-    createGame(user1, createCallback, null, null);
+      
+      client.disconnect();
+      done();
+    });
   });
 
-  it('should not allow game to be started by anyone other than the creator of the game', function(done) {
-    var clientsConnected = [];
+  it('should not allow game to start when there are less than 3 players connected (async)', function(done) {
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': joinConfirmDefault,
+      'gameStartReject': function(client, userInfo, data, callbackData, key) {
+        try {
+          assert.equal(data.error, 'Game must have at least three players to start.');
+        } catch(e) {
+          disconnectAll(callbackData);
+          done(e);
+          return;
+        }
 
-    var createCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected.push({client: client, user: userInfo});
-
-      joinGame(user2, gameInfo.id, joinCallback, null);
-      joinGame(user3, gameInfo.id, joinCallback, null);
+        disconnectAll(callbackData);
+        done();
+      }
     };
 
-    var joinCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected.push({client: client, user: userInfo});
-
-      // receive the reject message
-      client.on('gameStartReject', function(data) {
-        assert.equal(data.error, 'Only the game owner may start the game.');
-
-        // disconnect everyone and end the test
-        clientsConnected.forEach(function(c) {
-          c.client.disconnect();
-        });
-        
-        done();
-      });
-
-      if (clientsConnected.length == 2) {
-        clientsConnected[1].client.emit('requestGameStart', {user: clientsConnected[0].user, gameId: gameInfo.id});
-      }
-    }
-
-    createGame(user1, createCallback, null, null);
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners)
+      ], 
+    function(err, client, userInfo, callbackData) {
+      callbackData['connections'][0].client.emit('requestGameStart', {});
+    });
   });
 
-  it('should allow a game to be started!', function(done) {
-    var clientsConnected = [];
+  it('should not allow game to be started by anyone other than the creator of the game (async)', function(done) {
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': joinConfirmDefault,
+      'gameStartReject': function(client, userInfo, data, callbackData, key) {
+        try {
+          assert.equal(data.error, 'Only the game owner may start the game.');
+        } catch(e) {
+          disconnectAll(callbackData);
+          done(e);
+          return;
+        }
+
+        disconnectAll(callbackData);
+        done();
+      }
+    };
+
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners),
+      joinGameMaker(user3, listeners)
+      ], 
+    function(err, client, userInfo, callbackData) {
+      callbackData['connections'][1].client.emit('requestGameStart', {});
+    });
+  });
+
+  it('should allow a game to be started! (async)', function(done) {
+    var numWaitingForCards = 0;
     var numStartConfirm = 0;
-    var numWaitingForCards = 0;
-    var firstClient;
-    var startConfirmUserToChoose;
 
-    var gameStartConfirmCallback = function(data) {
-      // { question: { type: '(Pick 1)', value: 'What\'s there a ton of in heaven?' }, playerTurn: { name: 'u3', id: 'E8CFBMbKoD' } }
-      assert.equal(typeof data.question.type, 'string');
-      assert.equal(typeof data.question.value, 'string');
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': joinConfirmDefault,
+      'gameCanStart': gameCanStartDefault,
+      'gameStartConfirm': function(client, userInfo, data, callbackData, key) {
+        // { question: { type: '(Pick 1)', value: 'What\'s there a ton of in heaven?' }, playerTurn: { name: 'u3', id: 'E8CFBMbKoD' } }
+        callbackData[key] = data;
+        numStartConfirm++;
 
-      assert.equal(typeof data.playerTurn.name, 'string');
-      assert.equal(typeof data.playerTurn.id, 'string');
-      assert.equal(data.playerTurn.id.length, 10);
+        try {
+          assert.equal(typeof data.question.type, 'string');
+          assert.equal(typeof data.question.value, 'string');
 
-      numStartConfirm++;
-      startConfirmUserToChoose = data.playerTurn;
-    };
-
-    var yourTurnToChooseCallback = function(data) {
-      var client = this;
-      assert.equal(clientsConnected[client.io.engine.id].user.name, startConfirmUserToChoose.name);
-      assert.equal(clientsConnected[client.io.engine.id].user.id, startConfirmUserToChoose.id);
-    };
-
-    var yourTurnToAnswerCallback = function(data) {
-      var client = this;
-      assert.notEqual(clientsConnected[client.io.engine.id].user.name, startConfirmUserToChoose.name);
-      assert.notEqual(clientsConnected[client.io.engine.id].user.id, startConfirmUserToChoose.id);
-    };
-
-    var cardDrawnCallback = function(data) {
-      // { type: 'Answer', value: 'A disappointing birthday party.' }
-      var client = this;
-
-      assert.equal(data.type, 'Answer');
-      assert.equal(typeof data.value, 'string');
-
-      clientsConnected[client.io.engine.id].cards.push(data);
-    };
-
-    var waitingForCardsCallback = function(data) {
-      // { numPlayers: 2 }
-      numWaitingForCards++;
-
-      // since this is the last callback, when count is 3 it will be the final callback of the test case
-      if (numWaitingForCards === 3) {
-        assert.equal(data.numPlayers, 2);
-        assert.equal(numStartConfirm, 3);
-
-        // verify we have 3 unique clients
-        assert.equal(Object.keys(clientsConnected).length, 3);
-        for (var key in clientsConnected) {
-          // verify each client has 7 cards
-          assert.equal(clientsConnected[key].cards.length, 7);
-
-          clientsConnected[key].client.disconnect();      
+          assert.equal(typeof data.playerTurn.name, 'string');
+          assert.equal(typeof data.playerTurn.id, 'string');
+          assert.equal(data.playerTurn.id.length, 10);  
+        } catch(e) {
+          done(e);
         }
-        
-        done();
-      }
-    };
-
-    var createCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      firstClient = client;
-
-      client.on('gameStartConfirm', gameStartConfirmCallback);
-      client.on('yourTurnToChoose', yourTurnToChooseCallback);
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-
-      joinGame(user2, gameInfo.id, joinCallback, null);
-      joinGame(user3, gameInfo.id, joinCallback, null);
-    };
-
-    var joinCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-
-      client.on('gameStartConfirm', gameStartConfirmCallback);
-      client.on('yourTurnToChoose', yourTurnToChooseCallback);
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-
-      if (Object.keys(clientsConnected).length == 3) {
-        firstClient.emit('requestGameStart', {user: clientsConnected[firstClient.io.engine.id].user, gameId: gameInfo.id});
-      }
-    }
-
-    createGame(user1, createCallback, null, null);
-  });
-
-  it('should prevent card submission when not logged in', function(done) {
-    var cb = function(client, userInfo) {
-      client.emit('submitCardRequest', {user: user1, gameId: '123', card: { type: 'Answer', value: 'A disappointing birthday party.' }});
-
-      client.on('submitCardReject', function(data) {
-        assert.equal(data.error, 'User not found.');
-
-        client.disconnect();
-        done();
-      });
-    };
-
-    connectToServer(cb);
-  });
-
-  it('should prevent card submission when provided an invalid gameid', function(done) {
-    var cb = function(client, userInfo) {
-      client.emit('submitCardRequest', {user: user1, gameId: '123', card: { type: 'Answer', value: 'A disappointing birthday party.' }});
-
-      client.on('submitCardReject', function(data) {
-        assert.equal(data.error, 'Game not found.');
-
-        client.disconnect();
-        done();
-      });
-    };
-
-    signIn(user1, cb);
-  });
-
-  it('should prevent card submission when provided a malformed gameid', function(done) {
-    var cb = function(client, userInfo) {
-      client.emit('submitCardRequest', {user: user1, gameId: null, card: { type: 'Answer', value: 'A disappointing birthday party.' }});
-
-      client.on('submitCardReject', function(data) {
-        assert.equal(data.error, 'Game not found.');
-
-        client.disconnect();
-        done();
-      });
-    };
-
-    signIn(user1, cb);
-  });
-
-  it('should prevent card submission when the game is not ready', function(done) {
-    var createCallback = function(client, userInfo, gameInfo) {
-      joinGame(user2, gameInfo.id, joinCallback, null);
-    };
-
-    var joinCallback = function(client, userInfo, gameInfo) {
-      client.emit('submitCardRequest', {user: user1, gameId: gameInfo.id, card: { type: 'Answer', value: 'A disappointing birthday party.' }});
-
-      client.on('submitCardReject', function(data) {
-        assert.equal(data.error, 'Game not ready for card submission.');
-
-        client.disconnect();
-        done();
-      });
-    }
-
-    createGame(user1, createCallback, null, null);
-  });
-
-  it('should allow players to submit cards', function(done) {
-    var clientsConnected = [];
-    var numWaitingForCards = 0;
-    var firstClient;
-    
-    var userToChoose;
-    var usersToAnswer = [];
-    var cardsDealt = 0;
-
-
-    var yourTurnToChooseCallback = function(data) {
-      var client = this;
-      var userToChoose = client;
-    };
-
-    var yourTurnToAnswerCallback = function(data) {
-      var client = this;
-      usersToAnswer.push(client);
-    };
-
-    var cardDrawnCallback = function(data) {
-      // { type: 'Answer', value: 'A disappointing birthday party.' }
-      var client = this;
-      clientsConnected[client.io.engine.id].cards.push(data);
-      cardsDealt++;
-    };
-
-    var waitingForCardsCallback = function(data) {
-      // { numPlayers: 2 }
-      numWaitingForCards++;
-
-      // wait until all 3 get the initial callback
-      if (numWaitingForCards >= 3) {
-        // submit the cards
-        if (data.numPlayers === 2 && !(usersToAnswer[0].answered)) {
-          usersToAnswer[0].emit('submitCardRequest', {card: clientsConnected[usersToAnswer[0].io.engine.id].cards[0]});
-          usersToAnswer[0].answered = true;
+      },
+      'yourTurnToChoose': function(client, userInfo, data, callbackData, key) {
+        callbackData[key] = userInfo;
+        try {
+          assert.equal(userInfo.name, callbackData['gameStartConfirm'].playerTurn.name);
+          assert.equal(userInfo.id, callbackData['gameStartConfirm'].playerTurn.id);
+        } catch(e) {
+          done(e);
         }
-        if (data.numPlayers === 1 && !(usersToAnswer[1].answered)) {
-          usersToAnswer[1].emit('submitCardRequest', {card: clientsConnected[usersToAnswer[1].io.engine.id].cards[0]});
-          usersToAnswer[1].answered = true;
+      },
+      'yourTurnToAnswer': function(client, userInfo, data, callbackData, key) {
+        callbackData[key] = callbackData[key] || [];
+        callbackData[key].push(userInfo);
+
+        try {
+          assert.notEqual(userInfo.name, callbackData['gameStartConfirm'].playerTurn.name);
+          assert.notEqual(userInfo.id, callbackData['gameStartConfirm'].playerTurn.id);
+        } catch(e) {
+          done(e);
+        }
+      },
+      'cardDrawn': function(client, userInfo, data, callbackData, key) {
+        // { type: 'Answer', value: 'A disappointing birthday party.' }
+        try {
+          assert.equal(data.type, 'Answer');
+          assert.equal(typeof data.value, 'string');  
+        } catch(e) {
+          done(e);
+        }
+
+        var index = findConnection(callbackData, client);
+        callbackData['connections'][index].cards = callbackData['connections'][index].cards || [];
+        callbackData['connections'][index].cards.push(data);
+      },
+      'waitingForCards': function(client, userInfo, data, callbackData, key) {
+        // { numPlayers: 2 }
+        numWaitingForCards++;
+
+        // since this is the last callback, when count is 3 it will be the final callback of the test case
+        if (numWaitingForCards === 3) {
+          try {
+            assert.equal(data.numPlayers, 2);
+            assert.equal(numStartConfirm, 3);
+
+            // verify we have 3 unique clients
+            assert.equal(callbackData['connections'].length, 3);
+            callbackData['connections'].forEach(function(cl) {
+              assert.equal(cl.cards.length, 7);
+            });
+          } catch(e) {
+            disconnectAll(callbackData)
+            done(e);
+            return;
+          }
+          
+          disconnectAll(callbackData);
+          done();
         }
       }
     };
 
-    var submitCardConfirmCallback = function(data) {
-      // { accepted: true, card: { type: 'Answer', value: 'Tiny nipples.' } }
-      assert.equal(data.accepted, true);
-      assert.equal(data.card.type, 'Answer');
-      assert.equal(typeof data.card.value, 'string');
-    };
-
-    var chooseCardCallback = function(data) {
-      // { cards: [ { type: 'Answer', value: 'My manservant, Claude.' }, { type: 'Answer', value: 'That thing that electrocutes your abs.' } ] }
-      assert.equal(data.cards.length, 2);
-      assert.equal(typeof data.cards[0], 'object');
-      assert.equal(typeof data.cards[1], 'object');
-
-      for (var key in clientsConnected) {
-        // cleanup and end
-        clientsConnected[key].client.disconnect();      
-      }
-      
-      done();
-    };
-
-    var waitingForChooserCallback = function(data) {
-      // null
-      assert.equal(data, null);
-    };
-
-    var showCardsCallback = function(data) {
-      // { cards: [ { type: 'Answer', value: 'My manservant, Claude.' }, { type: 'Answer', value: 'That thing that electrocutes your abs.' } ] }
-      assert.equal(data.cards.length, 2);
-      assert.equal(typeof data.cards[0], 'object');
-      assert.equal(typeof data.cards[1], 'object');
-    };
-
-    var createCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      firstClient = client;
-
-      
-      client.on('yourTurnToChoose', yourTurnToChooseCallback);
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('submitCardConfirm', submitCardConfirmCallback);
-      client.on('chooseCard', chooseCardCallback);
-      client.on('waitingForChooser', waitingForChooserCallback);
-      client.on('showCards', showCardsCallback);
-
-      joinGame(user2, gameInfo.id, joinCallback, null);
-      joinGame(user3, gameInfo.id, joinCallback, null);
-    };
-
-    var joinCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-
-      
-      client.on('yourTurnToChoose', yourTurnToChooseCallback);
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('submitCardConfirm', submitCardConfirmCallback);
-      client.on('chooseCard', chooseCardCallback);
-      client.on('waitingForChooser', waitingForChooserCallback);
-      client.on('showCards', showCardsCallback);
-
-      if (Object.keys(clientsConnected).length == 3) {
-        firstClient.emit('requestGameStart', {user: clientsConnected[firstClient.io.engine.id].user, gameId: gameInfo.id});
-      }
-    }
-
-    createGame(user1, createCallback, null, null);
-  });
-
-  it('should prevent players from submitting invalid cards', function(done) {
-    var clientsConnected = [];
-    var numWaitingForCards = 0;
-    var firstClient;
-    
-    var usersToAnswer = [];
-
-    var yourTurnToAnswerCallback = function(data) {
-      var client = this;
-      usersToAnswer.push(client);
-    };
-
-    var waitingForCardsCallback = function(data) {
-      // { numPlayers: 2 }
-      numWaitingForCards++;
-
-      // wait until all 3 get the initial callback
-      if (numWaitingForCards >= 3) {
-        // submit the cards
-        if (data.numPlayers === 2 && !(usersToAnswer[0].answered)) {
-          usersToAnswer[0].emit('submitCardRequest', {card: {type: 'Answer', value: 'I made this one up'} });
-          usersToAnswer[0].answered = true;
-        }
-      }
-    };
-
-    var submitCardRejectCallback = function(data) {
-      // { error: 'Invalid card submitted.' }
-      assert.equal(data.error, 'Invalid card submitted.');
-
-      for (var key in clientsConnected) {
-        // cleanup and end
-        clientsConnected[key].client.disconnect();      
-      }
-      
-      done();
-    };
-
-    var createCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      firstClient = client;
-
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('submitCardReject', submitCardRejectCallback);
-
-      joinGame(user2, gameInfo.id, joinCallback, null);
-      joinGame(user3, gameInfo.id, joinCallback, null);
-    };
-
-    var joinCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('submitCardReject', submitCardRejectCallback);
-
-      if (Object.keys(clientsConnected).length == 3) {
-        firstClient.emit('requestGameStart', {user: clientsConnected[firstClient.io.engine.id].user, gameId: gameInfo.id});
-      }
-    }
-
-    createGame(user1, createCallback, null, null);
-  });
-
-  it('should prevent a player from submitting multiple cards', function(done) {
-    var clientsConnected = [];
-    var numWaitingForCards = 0;
-    var firstClient;
-    
-    var usersToAnswer = [];
-
-    var yourTurnToAnswerCallback = function(data) {
-      var client = this;
-      usersToAnswer.push(client);
-    };
-
-    var cardDrawnCallback = function(data) {
-      // { type: 'Answer', value: 'A disappointing birthday party.' }
-      var client = this;
-      clientsConnected[client.io.engine.id].cards.push(data);
-    };
-
-    var waitingForCardsCallback = function(data) {
-      // { numPlayers: 2 }
-      numWaitingForCards++;
-
-      // wait until all 3 get the initial callback
-      if (numWaitingForCards >= 3) {
-        // submit the cards
-        if (data.numPlayers === 2 && !(usersToAnswer[0].answered)) {
-          usersToAnswer[0].emit('submitCardRequest', {card: clientsConnected[usersToAnswer[0].io.engine.id].cards[0]});
-          usersToAnswer[0].emit('submitCardRequest', {card: clientsConnected[usersToAnswer[0].io.engine.id].cards[3]});
-          usersToAnswer[0].answered = true;
-        }
-      }
-    };
-
-    var submitCardRejectCallback = function(data) {
-      // { error: 'Invalid card submitted.' }
-      assert.equal(data.error, 'User has already submitted a card.');
-
-      for (var key in clientsConnected) {
-        // cleanup and end
-        clientsConnected[key].client.disconnect();      
-      }
-      
-      done();
-    };
-
-    var createCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      firstClient = client;
-
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('submitCardReject', submitCardRejectCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-
-      joinGame(user2, gameInfo.id, joinCallback, null);
-      joinGame(user3, gameInfo.id, joinCallback, null);
-    };
-
-    var joinCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('submitCardReject', submitCardRejectCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-
-      if (Object.keys(clientsConnected).length == 3) {
-        firstClient.emit('requestGameStart', {});
-      }
-    }
-
-    createGame(user1, createCallback, null, null);
-  });
-
-  it('should prevent card choosing when not logged in', function(done) {
-    var cb = function(client, userInfo) {
-      client.emit('chooseAnswer', {card: { type: 'Answer', value: 'A disappointing birthday party.' }});
-
-      client.on('chooseAnswerReject', function(data) {
-        assert.equal(data.error, 'User not found.');
-
-        client.disconnect();
-        done();
-      });
-    };
-
-    connectToServer(cb);
-  });
-
-  it('should prevent card choosing when provided an invalid gameid', function(done) {
-    var cb = function(client, userInfo) {
-      client.emit('chooseAnswer', {card: { type: 'Answer', value: 'A disappointing birthday party.' }});
-
-      client.on('chooseAnswerReject', function(data) {
-        assert.equal(data.error, 'Game not found.');
-
-        client.disconnect();
-        done();
-      });
-    };
-
-    signIn(user1, cb);
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners),
+      joinGameMaker(user3, listeners),
+      ], 
+    function(err, client, userInfo, callbackData) {      
+    });
   });
   
-  it('should prevent other players from choosing out of turn', function(done) {
-    var clientsConnected = [];
-    var numWaitingForCards = 0;
-    var firstClient;
-    
-    var usersToAnswer = [];
+  it('should prevent card submission when not logged in (async)', function(done) {
+    async.waterfall([
+      function(callback) {
+        var client = io.connect(socketURL, options);
+        client.emit('submitCardRequest', {card: { type: 'Answer', value: 'A disappointing birthday party.' }});
 
-    var chooseCardCallback = function(data) {
-      usersToAnswer[0].emit('chooseAnswer', {card: clientsConnected[usersToAnswer[0].io.engine.id].cards[0]});
-    };
-
-    var yourTurnToAnswerCallback = function(data) {
-      var client = this;
-      usersToAnswer.push(client);
-    };
-
-    var cardDrawnCallback = function(data) {
-      // { type: 'Answer', value: 'A disappointing birthday party.' }
-      var client = this;
-      clientsConnected[client.io.engine.id].cards.push(data);
-    };
-
-    var waitingForCardsCallback = function(data) {
-      // { numPlayers: 2 }
-      numWaitingForCards++;
-
-      // wait until all 3 get the initial callback
-      if (numWaitingForCards >= 3) {
-        // submit the cards
-        if (data.numPlayers === 2 && !(usersToAnswer[0].answered)) {
-          usersToAnswer[0].emit('submitCardRequest', {card: clientsConnected[usersToAnswer[0].io.engine.id].cards[0]});
-          usersToAnswer[0].answered = true;
-        }
-        if (data.numPlayers === 1 && !(usersToAnswer[1].answered)) {
-          usersToAnswer[1].emit('submitCardRequest', {card: clientsConnected[usersToAnswer[1].io.engine.id].cards[0]});
-          usersToAnswer[1].answered = true;
-        }
+        client.on('submitCardReject', function(data) {
+          callback(data, client);
+        });
       }
-    };
-
-    var chooseAnswerRejectCallback = function(data) {
-      // { error: 'Invalid card submitted.' }
-      assert.equal(data.error, 'It is not the user\'s turn to choose.');
-
-      for (var key in clientsConnected) {
-        // cleanup and end
-        clientsConnected[key].client.disconnect();      
-      }
-      
-      done();
-    };
-
-    var createCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      firstClient = client;
-
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('chooseAnswerReject', chooseAnswerRejectCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-      client.on('chooseCard', chooseCardCallback);
-
-      joinGame(user2, gameInfo.id, joinCallback, null);
-      joinGame(user3, gameInfo.id, joinCallback, null);
-    };
-
-    var joinCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('chooseAnswerReject', chooseAnswerRejectCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-      client.on('chooseCard', chooseCardCallback);
-
-      if (Object.keys(clientsConnected).length == 3) {
-        firstClient.emit('requestGameStart', {});
-      }
-    }
-
-    createGame(user1, createCallback, null, null);
-  });
-
-  it('should prevent choosing a card that does not exist', function(done) {
-    var clientsConnected = [];
-    var numWaitingForCards = 0;
-    var firstClient;
-    
-    var usersToAnswer = [];
-    var clientToChoose;
-
-    var yourTurnToChooseCallback = function(data) {
-      var client = this;
-      clientToChoose = client;
-    };
-
-    var chooseCardCallback = function(data) {
-      clientToChoose.emit('chooseAnswer', {card: clientsConnected[usersToAnswer[0].io.engine.id].cards[5]});
-    };
-
-    var yourTurnToAnswerCallback = function(data) {
-      var client = this;
-      usersToAnswer.push(client);
-    };
-
-    var cardDrawnCallback = function(data) {
-      // { type: 'Answer', value: 'A disappointing birthday party.' }
-      var client = this;
-      clientsConnected[client.io.engine.id].cards.push(data);
-    };
-
-    var waitingForCardsCallback = function(data) {
-      // { numPlayers: 2 }
-      numWaitingForCards++;
-
-      // wait until all 3 get the initial callback
-      if (numWaitingForCards >= 3) {
-        // submit the cards
-        if (data.numPlayers === 2 && !(usersToAnswer[0].answered)) {
-          usersToAnswer[0].emit('submitCardRequest', {card: clientsConnected[usersToAnswer[0].io.engine.id].cards[0]});
-          usersToAnswer[0].answered = true;
-        }
-        if (data.numPlayers === 1 && !(usersToAnswer[1].answered)) {
-          usersToAnswer[1].emit('submitCardRequest', {card: clientsConnected[usersToAnswer[1].io.engine.id].cards[0]});
-          usersToAnswer[1].answered = true;
-        }
-      }
-    };
-
-    var chooseAnswerRejectCallback = function(data) {
-      // { error: 'Invalid card submitted.' }
-      assert.equal(data.error, 'Invalid card choice.');
-
-      for (var key in clientsConnected) {
-        // cleanup and end
-        clientsConnected[key].client.disconnect();      
-      }
-      
-      done();
-    };
-
-    var createCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      firstClient = client;
-
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('yourTurnToChoose', yourTurnToChooseCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('chooseAnswerReject', chooseAnswerRejectCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-      client.on('chooseCard', chooseCardCallback);
-
-      joinGame(user2, gameInfo.id, joinCallback, null);
-      joinGame(user3, gameInfo.id, joinCallback, null);
-    };
-
-    var joinCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('yourTurnToChoose', yourTurnToChooseCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('chooseAnswerReject', chooseAnswerRejectCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-      client.on('chooseCard', chooseCardCallback);
-
-      if (Object.keys(clientsConnected).length == 3) {
-        firstClient.emit('requestGameStart', {});
-      }
-    }
-
-    createGame(user1, createCallback, null, null);
-  });
-
-  it('should prevent choosing when the game is not ready', function(done) {
-    var clientsConnected = [];
-    var numWaitingForCards = 0;
-    var firstClient;
-    
-    var usersToAnswer = [];
-
-    var yourTurnToAnswerCallback = function(data) {
-      var client = this;
-      usersToAnswer.push(client);
-    };
-
-    var cardDrawnCallback = function(data) {
-      // { type: 'Answer', value: 'A disappointing birthday party.' }
-      var client = this;
-      clientsConnected[client.io.engine.id].cards.push(data);
-    };
-
-    var waitingForCardsCallback = function(data) {
-      // { numPlayers: 2 }
-      numWaitingForCards++;
-
-      // wait until all 3 get the initial callback
-      if (numWaitingForCards >= 3) {
-        // submit the cards
-        if (data.numPlayers === 2 && !(usersToAnswer[0].answered)) {
-          usersToAnswer[0].emit('submitCardRequest', {card: clientsConnected[usersToAnswer[0].io.engine.id].cards[0]});
-          usersToAnswer[0].answered = true;
-          usersToAnswer[0].emit('chooseAnswer', {card: clientsConnected[usersToAnswer[0].io.engine.id].cards[0]});
-        }
-      }
-    };
-
-    var chooseAnswerRejectCallback = function(data) {
-      // { error: 'Invalid card submitted.' }
-      assert.equal(data.error, 'Game not yet ready for choice.');
-
-      for (var key in clientsConnected) {
-        // cleanup and end
-        clientsConnected[key].client.disconnect();      
-      }
-      
-      done();
-    };
-
-    var createCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      firstClient = client;
-
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('chooseAnswerReject', chooseAnswerRejectCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-
-      joinGame(user2, gameInfo.id, joinCallback, null);
-      joinGame(user3, gameInfo.id, joinCallback, null);
-    };
-
-    var joinCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('chooseAnswerReject', chooseAnswerRejectCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-
-      if (Object.keys(clientsConnected).length == 3) {
-        firstClient.emit('requestGameStart', {});
-      }
-    }
-
-    createGame(user1, createCallback, null, null);
-  });
-
-  it('should reward a point for a valid choice', function(done) {
-    var clientsConnected = [];
-    var numWaitingForCards = 0;
-    var firstClient;
-    
-    var usersToAnswer = [];
-    var clientToChoose;
-
-    var chooseConfirmCallback = function(data) {
-      // data: null
-      assert.equal(data, null);
-    };
-
-    var cardChosenCallback = function(data) {
-      // { card: { type: 'Answer', value: 'The mixing of the races.' }, winner: { name: 'u1', id: 's3wPGUqFmT' } }
-      assert.equal(typeof data.card, 'object');
-      assert.equal(data.card.type, 'Answer');
-      assert.equal(typeof data.card.value, 'string');
-
-      assert.equal(typeof data.winner, 'object');
-      assert.equal(typeof data.winner.name, 'string');
-      assert.equal(typeof data.winner.id, 'string');      
-    };
-
-    var scoreUpdateCallback = function(data) {
-      // data: [ { name: 'u1', id: 's3wPGUqFmT', score: 1 }, { name: 'u2', id: 'APGC6m2MCh', score: 0 }, { name: 'u3', id: 'EamrWoHFmP', score: 0 } ]
-      assert.equal(Array.isArray(data), true);
-      assert.equal(typeof data[0], 'object');
-      assert.equal(typeof data[0].name, 'string');
-      assert.equal(typeof data[0].id, 'string');
-      assert.equal(typeof data[0].score, 'number');
-    };
-
-    var startNextRoundPromptCallback = function(data) {
-      // data: null
-      assert.equal(data, null);
-      
-      for (var key in clientsConnected) {
-        // cleanup and end
-        clientsConnected[key].client.disconnect();      
-      }
-      
-      done();
-    };
-
-    var yourTurnToChooseCallback = function(data) {
-      var client = this;
-      clientToChoose = client;
-    };
-
-    var chooseCardCallback = function(data) {
-      clientToChoose.emit('chooseAnswer', {card: data.cards[0]});
-    };
-
-    var yourTurnToAnswerCallback = function(data) {
-      var client = this;
-      usersToAnswer.push(client);
-    };
-
-    var cardDrawnCallback = function(data) {
-      // { type: 'Answer', value: 'A disappointing birthday party.' }
-      var client = this;
-      clientsConnected[client.io.engine.id].cards.push(data);
-    };
-
-    var waitingForCardsCallback = function(data) {
-      // { numPlayers: 2 }
-      numWaitingForCards++;
-
-      // wait until all 3 get the initial callback
-      if (numWaitingForCards >= 3) {
-        // submit the cards
-        if (data.numPlayers === 2 && !(usersToAnswer[0].answered)) {
-          usersToAnswer[0].emit('submitCardRequest', {card: clientsConnected[usersToAnswer[0].io.engine.id].cards[0]});
-          usersToAnswer[0].answered = true;
-        }
-        if (data.numPlayers === 1 && !(usersToAnswer[1].answered)) {
-          usersToAnswer[1].emit('submitCardRequest', {card: clientsConnected[usersToAnswer[1].io.engine.id].cards[0]});
-          usersToAnswer[1].answered = true;
-        }
-      }
-    };
-
-    var createCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      firstClient = client;
-
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('yourTurnToChoose', yourTurnToChooseCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-      client.on('chooseCard', chooseCardCallback);
-
-      client.on('chooseConfirm', chooseConfirmCallback);
-      client.on('cardChosen', cardChosenCallback);
-      client.on('scoreUpdate', scoreUpdateCallback);
-      client.on('startNextRoundPrompt', startNextRoundPromptCallback);
-
-      joinGame(user2, gameInfo.id, joinCallback, null);
-      joinGame(user3, gameInfo.id, joinCallback, null);
-    };
-
-    var joinCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      
-      client.on('yourTurnToAnswer', yourTurnToAnswerCallback);
-      client.on('yourTurnToChoose', yourTurnToChooseCallback);
-      client.on('waitingForCards', waitingForCardsCallback);
-      client.on('cardDrawn', cardDrawnCallback);
-      client.on('chooseCard', chooseCardCallback);
-
-      client.on('chooseConfirm', chooseConfirmCallback);
-      client.on('cardChosen', cardChosenCallback);
-      client.on('scoreUpdate', scoreUpdateCallback);
-      client.on('startNextRoundPrompt', startNextRoundPromptCallback);
-
-      if (Object.keys(clientsConnected).length == 3) {
-        firstClient.emit('requestGameStart', {});
-      }
-    }
-
-    createGame(user1, createCallback, null, null);
-  });
-
-  it('should prevent requesting a new round when not logged in', function(done) {
-    var cb = function(client, userInfo) {
-      client.emit('requestStartNextRound', null);
-
-      client.on('startNextRoundReject', function(data) {
-        assert.equal(data.error, 'User not found.');
-
+      ], 
+    function(err, client) {
+      // data should contain an error message
+      try {
+        assert.equal(err.error, 'User not found.');  
+      } catch(e) {
         client.disconnect();
+        done(e);
+        return;
+      }
+      
+      client.disconnect();
+      done();
+    });
+  });
+
+  it('should prevent card submission when provided an invalid (or null) gameid (async)', function(done) {
+    async.waterfall([
+      signInMaker(user1),
+      function(client, userInfo, callback) {
+        client.emit('submitCardRequest', {card: { type: 'Answer', value: 'A disappointing birthday party.' }});
+
+        client.on('submitCardReject', function(data) {
+          callback(data, client);
+        });
+      }
+      ], 
+    function(err, client) {
+      // data should contain an error message
+      try {
+        assert.equal(err.error, 'Game not found.');  
+      } catch(e) {
+        client.disconnect();
+        done(e);
+        return;
+      }
+      
+      client.disconnect();
+      done();
+    });
+  });
+
+  it('should prevent card submission when the game is not ready (async)', function(done) {
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': function(client, userInfo, data, callbackData, key) {
+        client.emit('submitCardRequest', {card: { type: 'Answer', value: 'A disappointing birthday party.' }});
+      },
+      'submitCardReject': function(client, userInfo, data, callbackData, key) {
+        try {
+          assert.equal(data.error, 'Game not ready for card submission.');  
+        } catch(e) {
+          client.disconnect();
+          callbackData['connections'][0].client.disconnect();
+          done(e);
+          return;
+        }
+        
+        client.disconnect();
+        callbackData['connections'][0].client.disconnect();
         done();
+      }
+    };
+
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners)
+      ], 
+    function(err, client, userInfo, callbackData) {
+    });
+  });
+
+  it('should allow players to submit cards (async)', function(done) {
+    var numWaitingForCards = 0;
+    var numShown = 0;
+
+    var onFinish = function(callbackData) {
+      callbackData['connections'].forEach(function(cl) {
+        cl.client.disconnect();
       });
     };
 
-    connectToServer(cb);
+    var showOrChooseCard = function(client, userInfo, data, callbackData, key) {
+      // { cards: [ { type: 'Answer', value: 'My manservant, Claude.' }, { type: 'Answer', value: 'That thing that electrocutes your abs.' } ] }
+      try {
+        assert.equal(data.cards.length, 2);
+        assert.equal(typeof data.cards[0], 'object');
+        assert.equal(typeof data.cards[1], 'object');
+      } catch(e) {
+        onFinish(callbackData);
+        done(e);
+        return;
+      }
+
+      numShown++;
+      if (numShown == 3) {
+        onFinish(callbackData);
+        done();
+      }
+    };
+
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': joinConfirmDefault,
+      'gameCanStart': gameCanStartDefault,
+      'yourTurnToChoose': yourTurnToChooseDefault,
+      'yourTurnToAnswer': yourTurnToAnswerDefault,
+      'cardDrawn': cardDrawnDefault,
+      'waitingForCards': function(client, userInfo, data, callbackData, key) {
+        // { numPlayers: 2 }
+        numWaitingForCards++;
+
+        // wait until all 3 get the initial callback
+        if (numWaitingForCards >= 3) {
+          // submit the cards
+          if (data.numPlayers === 2) {
+            
+            var client1 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][0])];
+            var client2 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][1])];
+
+            client1.client.emit('submitCardRequest', {card: client1.cards[0]});
+            client2.client.emit('submitCardRequest', {card: client2.cards[0]});
+          }
+        }
+      },
+      'submitCardConfirm': function(client, userInfo, data, callbackData, key) {
+        // { accepted: true, card: { type: 'Answer', value: 'Tiny nipples.' } }
+        try {
+          assert.equal(data.accepted, true);
+          assert.equal(data.card.type, 'Answer');
+          assert.equal(typeof data.card.value, 'string');  
+        } catch(e) {
+          onFinish(callbackData);
+          done(e);
+        }
+      },
+      'waitingForChooser': function(client, userInfo, data, callbackData, key) {
+        // null
+        try {
+          assert.equal(data, null);
+        } catch(e) {
+          onFinish(callbackData);
+          done(e);
+        }
+      },
+      'chooseCard': showOrChooseCard,
+      'showCards': showOrChooseCard
+    };
+
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners),
+      joinGameMaker(user3, listeners),
+      ], 
+    function(err, client, userInfo, callbackData) {
+    });
   });
 
-  it('should prevent requesting a new round when provided an invalid gameid', function(done) {
-    var cb = function(client, userInfo) {
-      client.emit('requestStartNextRound', null);
+  it('should prevent players from submitting invalid cards (async)', function(done) {
+    var numWaitingForCards = 0;
 
-      client.on('startNextRoundReject', function(data) {
-        assert.equal(data.error, 'Game not found.');
-
-        client.disconnect();
-        done();
+    var onFinish = function(callbackData) {
+      callbackData['connections'].forEach(function(cl) {
+        cl.client.disconnect();
       });
     };
 
-    signIn(user1, cb);
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': joinConfirmDefault,
+      'gameCanStart': gameCanStartDefault,
+      'yourTurnToChoose': yourTurnToChooseDefault,
+      'yourTurnToAnswer': yourTurnToAnswerDefault,
+      'cardDrawn': cardDrawnDefault,
+      'waitingForCards': function(client, userInfo, data, callbackData, key) {
+        // { numPlayers: 2 }
+        numWaitingForCards++;
+
+        // wait until all 3 get the initial callback
+        if (numWaitingForCards >= 3) {
+          // submit the cards
+          if (data.numPlayers === 2) {
+            var client1 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][0])];
+            client1.client.emit('submitCardRequest', {card: {type: 'Answer', value: 'I made this one up'} });
+          }
+        }
+      },
+      'submitCardReject': function(client, userInfo, data, callbackData, key) {
+        // {"error":"Invalid card submitted."}
+        try {
+          assert.equal(data.error, 'Invalid card submitted.');
+        } catch(e) {
+          onFinish(callbackData);
+          done(e);
+          return;
+        }
+
+        onFinish(callbackData);
+        done();
+      },
+    };
+
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners),
+      joinGameMaker(user3, listeners),
+      ], 
+    function(err, client, userInfo, callbackData) {
+    });
   });
 
-  it('should prevent requesting a new round when the game is not ready', function(done) {
-    var clientsConnected = [];
+  it('should prevent a player from submitting multiple cards (async)', function(done) {
     var numWaitingForCards = 0;
-    var firstClient;
-    
-    var usersToAnswer = [];
 
-
-    var yourTurnToChooseCallback = function(data) {
-      var client = this;
-      client.emit('requestStartNextRound', null);
+    var onFinish = function(callbackData) {
+      callbackData['connections'].forEach(function(cl) {
+        cl.client.disconnect();
+      });
     };
 
-    var startNextRoundRejectCallback = function(data) {
-      // { error: 'Invalid card submitted.' }
-      assert.equal(data.error, 'Game not ready to start a new round.');
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': joinConfirmDefault,
+      'gameCanStart': gameCanStartDefault,
+      'yourTurnToChoose': yourTurnToChooseDefault,
+      'yourTurnToAnswer': yourTurnToAnswerDefault,
+      'cardDrawn': cardDrawnDefault,
+      'waitingForCards': function(client, userInfo, data, callbackData, key) {
+        // { numPlayers: 2 }
+        numWaitingForCards++;
 
-      for (var key in clientsConnected) {
-        // cleanup and end
-        clientsConnected[key].client.disconnect();      
-      }
-      
-      done();
+        // wait until all 3 get the initial callback
+        if (numWaitingForCards >= 3) {
+          // submit the cards
+          if (data.numPlayers === 2) {
+            var client1 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][0])];
+            client1.client.emit('submitCardRequest', {card: client1.cards[0] });
+            client1.client.emit('submitCardRequest', {card: client1.cards[4] });
+          }
+        }
+      },
+      'submitCardReject': function(client, userInfo, data, callbackData, key) {
+        // {"error":"User has already submitted a card."}
+        try {
+          assert.equal(data.error, 'User has already submitted a card.');
+        } catch(e) {
+          onFinish(callbackData);
+          done(e);
+          return;
+        }
+
+        onFinish(callbackData);
+        done();
+      },
     };
 
-    var createCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      firstClient = client;
-
-      client.on('yourTurnToChoose', yourTurnToChooseCallback);
-      client.on('startNextRoundReject', startNextRoundRejectCallback);
-
-      joinGame(user2, gameInfo.id, joinCallback, null);
-      joinGame(user3, gameInfo.id, joinCallback, null);
-    };
-
-    var joinCallback = function(client, userInfo, gameInfo) {
-      // save the client refs to disconnect at the end of the test
-      clientsConnected[client.io.engine.id] = {client: client, user: userInfo, cards: []};
-      
-      client.on('yourTurnToChoose', yourTurnToChooseCallback);
-      client.on('startNextRoundReject', startNextRoundRejectCallback);
-
-      if (Object.keys(clientsConnected).length == 3) {
-        firstClient.emit('requestGameStart', {});
-      }
-    }
-
-    createGame(user1, createCallback, null, null);
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners),
+      joinGameMaker(user3, listeners),
+      ], 
+    function(err, client, userInfo, callbackData) {
+    });
   });
+
+  it('should prevent card choosing when not logged in (async)', function(done) {
+    async.waterfall([
+      function(callback) {
+        var client = io.connect(socketURL, options);
+        client.emit('chooseAnswer', {card: { type: 'Answer', value: 'A disappointing birthday party.' }});
+
+        client.on('chooseAnswerReject', function(data) {
+          callback(data, client);
+        });
+      }
+      ], 
+    function(err, client) {
+      // data should contain an error message
+      try {
+        assert.equal(err.error, 'User not found.');  
+      } catch(e) {
+        client.disconnect();
+        done(e);
+        return;
+      }
+      
+      client.disconnect();
+      done();
+    });
+  });
+
+  it('should prevent card choosing when provided an invalid gameid (async)', function(done) {
+    async.waterfall([
+      signInMaker(user1),
+      function(client, userInfo, callback) {
+        client.emit('chooseAnswer', {card: { type: 'Answer', value: 'A disappointing birthday party.' }});
+
+        client.on('chooseAnswerReject', function(data) {
+          callback(data, client);
+        });
+      }
+      ], 
+    function(err, client) {
+      // data should contain an error message
+      try {
+        assert.equal(err.error, 'Game not found.');  
+      } catch(e) {
+        client.disconnect();
+        done(e);
+        return;
+      }
+      
+      client.disconnect();
+      done();
+    });
+  });
+
+  it('should prevent other players from choosing out of turn (async)', function(done) {
+    var numWaitingForCards = 0;
+    var onFinish = function(callbackData) {
+      callbackData['connections'].forEach(function(cl) {
+        cl.client.disconnect();
+      });
+    };
+
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': joinConfirmDefault,
+      'gameCanStart': gameCanStartDefault,
+      'yourTurnToChoose': yourTurnToChooseDefault,
+      'yourTurnToAnswer': yourTurnToAnswerDefault,
+      'cardDrawn': cardDrawnDefault,
+      'waitingForCards': function(client, userInfo, data, callbackData, key) {
+        // { numPlayers: 2 }
+        numWaitingForCards++;
+
+        // wait until all 3 get the initial callback
+        if (numWaitingForCards >= 3) {
+          // submit the cards
+          if (data.numPlayers === 2) {
+            var client1 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][0])];
+            var client2 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][1])];
+            client1.client.emit('submitCardRequest', {card: client1.cards[0] });
+            client2.client.emit('submitCardRequest', {card: client2.cards[0] });
+          }
+        }
+      },
+      'chooseAnswerReject': function(client, userInfo, data, callbackData, key) {
+        // {"error":"It is not the user's turn to choose."}
+        try {
+          assert.equal(data.error, 'It is not the user\'s turn to choose.');
+        } catch(e) {
+          onFinish(callbackData);
+          done(e);
+          return;
+        }
+        onFinish(callbackData);
+        done();
+      },
+      'chooseCard': function(client, userInfo, data, callbackData, key) {
+        var client1 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][0])];
+        client1.client.emit('chooseAnswer', {card: data.cards[0]});
+      }
+    };
+
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners),
+      joinGameMaker(user3, listeners),
+      ], 
+    function(err, client, userInfo, callbackData) {
+    });
+  });
+  
+  it('should prevent choosing a card that does not exist (async)', function(done) {
+    var numWaitingForCards = 0;
+    var onFinish = function(callbackData) {
+      callbackData['connections'].forEach(function(cl) {
+        cl.client.disconnect();
+      });
+    };
+
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': joinConfirmDefault,
+      'gameCanStart': gameCanStartDefault,
+      'yourTurnToChoose': yourTurnToChooseDefault,
+      'yourTurnToAnswer': yourTurnToAnswerDefault,
+      'cardDrawn': cardDrawnDefault,
+      'waitingForCards': function(client, userInfo, data, callbackData, key) {
+        // { numPlayers: 2 }
+        numWaitingForCards++;
+
+        // wait until all 3 get the initial callback
+        if (numWaitingForCards >= 3) {
+          // submit the cards
+          if (data.numPlayers === 2) {
+            var client1 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][0])];
+            var client2 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][1])];
+            client1.client.emit('submitCardRequest', {card: client1.cards[0] });
+            client2.client.emit('submitCardRequest', {card: client2.cards[0] });
+          }
+        }
+      },
+      'chooseAnswerReject': function(client, userInfo, data, callbackData, key) {
+        // {"error":"Invalid card choice."}
+        try {
+          assert.equal(data.error, 'Invalid card choice.');
+        } catch(e) {
+          onFinish(callbackData);
+          done(e);
+          return;
+        }
+        onFinish(callbackData);
+        done();
+      },
+      'chooseCard': function(client, userInfo, data, callbackData, key) {
+        var client1 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][0])];
+        client.emit('chooseAnswer', {card: client1.cards[5]});
+      }
+    };
+
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners),
+      joinGameMaker(user3, listeners),
+      ], 
+    function(err, client, userInfo, callbackData) {
+    });
+  });
+
+  it('should prevent choosing when the game is not ready (async)', function(done) {
+    var numWaitingForCards = 0;
+    var onFinish = function(callbackData) {
+      callbackData['connections'].forEach(function(cl) {
+        cl.client.disconnect();
+      });
+    };
+
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': joinConfirmDefault,
+      'gameCanStart': gameCanStartDefault,
+      'yourTurnToChoose': yourTurnToChooseDefault,
+      'yourTurnToAnswer': yourTurnToAnswerDefault,
+      'cardDrawn': cardDrawnDefault,
+      'waitingForCards': function(client, userInfo, data, callbackData, key) {
+        // { numPlayers: 2 }
+        numWaitingForCards++;
+
+        // wait until all 3 get the initial callback
+        if (numWaitingForCards >= 3) {
+          // submit the cards
+          if (data.numPlayers === 2) {
+            var client1 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][0])];
+            client1.client.emit('submitCardRequest', {card: client1.cards[0]});
+            
+            callbackData['yourTurnToChoose'].emit('chooseAnswer', {card: client1.cards[0]});
+          }
+        }
+      },
+      'chooseAnswerReject': function(client, userInfo, data, callbackData, key) {
+        // {"error":"Game not yet ready for choice."}
+        try {
+          assert.equal(data.error, 'Game not yet ready for choice.');
+        } catch(e) {
+          onFinish(callbackData);
+          done(e);
+          return;
+        }
+        onFinish(callbackData);
+        done();
+      }
+    };
+
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners),
+      joinGameMaker(user3, listeners),
+      ], 
+    function(err, client, userInfo, callbackData) {
+    });
+  });
+
+  it('should reward a point for a valid choice (async)', function(done) {
+    var numWaitingForCards = 0;
+    var numShown = 0;
+
+    var onFinish = function(callbackData) {
+      callbackData['connections'].forEach(function(cl) {
+        cl.client.disconnect();
+      });
+    };
+
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': joinConfirmDefault,
+      'gameCanStart': gameCanStartDefault,
+      'yourTurnToChoose': yourTurnToChooseDefault,
+      'yourTurnToAnswer': yourTurnToAnswerDefault,
+      'cardDrawn': cardDrawnDefault,
+      'waitingForCards': function(client, userInfo, data, callbackData, key) {
+        // data: { numPlayers: 2 }
+        numWaitingForCards++;
+
+        // wait until all 3 get the initial callback
+        if (numWaitingForCards >= 3) {
+          // submit the cards
+          if (data.numPlayers === 2) {
+            
+            var client1 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][0])];
+            var client2 = callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][1])];
+
+            client1.client.emit('submitCardRequest', {card: client1.cards[0]});
+            client2.client.emit('submitCardRequest', {card: client2.cards[0]});
+          }
+        }
+      },
+      'chooseCard': function(client, userInfo, data, callbackData, key) {
+        // data: { cards: [ { type: 'Answer', value: 'My manservant, Claude.' }, { type: 'Answer', value: 'That thing that electrocutes your abs.' } ] }
+        client.emit('chooseAnswer', {card: data.cards[0]});
+      },
+      'chooseConfirm': function(client, userInfo, data, callbackData, key) {
+        // data: null
+        try {
+          assert.equal(data, null);
+        } catch(e) {
+          done(e);
+        }
+      }, 
+      'cardChosen': function(client, userInfo, data, callbackData, key) {
+        // data: { card: { type: 'Answer', value: 'The mixing of the races.' }, winner: { name: 'u1', id: 's3wPGUqFmT' } }
+        try {
+          assert.equal(typeof data.card, 'object');
+          assert.equal(data.card.type, 'Answer');
+          assert.equal(typeof data.card.value, 'string');
+
+          assert.equal(typeof data.winner, 'object');
+          assert.equal(typeof data.winner.name, 'string');
+          assert.equal(typeof data.winner.id, 'string');  
+        } catch(e) {
+          done(e);
+        }
+      },
+      'scoreUpdate': function(client, userInfo, data, callbackData, key) {
+        // data: [ { name: 'u1', id: 's3wPGUqFmT', score: 1 }, { name: 'u2', id: 'APGC6m2MCh', score: 0 }, { name: 'u3', id: 'EamrWoHFmP', score: 0 } ]
+        try {
+          assert.equal(Array.isArray(data), true);
+          assert.equal(typeof data[0], 'object');
+          assert.equal(typeof data[0].name, 'string');
+          assert.equal(typeof data[0].id, 'string');
+          assert.equal(typeof data[0].score, 'number');
+        } catch(e) {
+          done(e);
+        }
+      },
+      'startNextRoundPrompt': function(client, userInfo, data, callbackData, key) {
+        // data: null
+        try {
+          assert.equal(data, null);  
+        } catch(e) {
+          onFinish(callbackData);
+          done(e);
+          return;
+        }
+        
+        onFinish(callbackData);
+        done();
+      }
+    };
+
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners),
+      joinGameMaker(user3, listeners),
+      ], 
+    function(err, client, userInfo, callbackData) {
+    });
+  });
+
+  it('should prevent requesting a new round when not logged in (async)', function(done) {
+    async.waterfall([
+      function(callback) {
+        var client = io.connect(socketURL, options);
+        client.emit('requestStartNextRound', null);
+
+        client.on('startNextRoundReject', function(data) {
+          callback(data, client);
+        });
+      }
+      ], 
+    function(err, client) {
+      // data should contain an error message
+      try {
+        assert.equal(err.error, 'User not found.');  
+      } catch(e) {
+        client.disconnect();
+        done(e);
+        return;
+      }
+      
+      client.disconnect();
+      done();
+    });
+  });
+
+  it('should prevent requesting a new round when provided an invalid gameid (async)', function(done) {
+    async.waterfall([
+      signInMaker(user1),
+      function(client, userInfo, callback) {
+        client.emit('requestStartNextRound', null);
+
+        client.on('startNextRoundReject', function(data) {
+          callback(data, client);
+        });
+      }
+      ], 
+    function(err, client) {
+      // data should contain an error message
+      try {
+        assert.equal(err.error, 'Game not found.');  
+      } catch(e) {
+        client.disconnect();
+        done(e);
+        return;
+      }
+      
+      client.disconnect();
+      done();
+    });
+  });
+
+
+  it('should prevent requesting a new round when the game is not ready (async)', function(done) {
+    var numWaitingForCards = 0;
+    var numShown = 0;
+
+    var onFinish = function(callbackData) {
+      callbackData['connections'].forEach(function(cl) {
+        cl.client.disconnect();
+      });
+    };
+
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': joinConfirmDefault,
+      'gameCanStart': gameCanStartDefault,
+      'yourTurnToChoose': function(client, userInfo, data, callbackData, key) {
+        client.emit('requestStartNextRound', null);
+      },
+      'startNextRoundReject': function(client, userInfo, data, callbackData, key) {
+        // data: { error: 'Game not ready to start a new round.' }
+        try {
+          assert.equal(data.error, 'Game not ready to start a new round.');
+        } catch(e) {
+          onFinish(callbackData);
+          done(e);
+          return;
+        }
+        
+        onFinish(callbackData);
+        done();
+      }
+    };
+
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners),
+      joinGameMaker(user3, listeners),
+      ], 
+    function(err, client, userInfo, callbackData) {
+    });
+  });
+
+
 
   it('should prevent other players from starting a new round', function(done) {
     var clientsConnected = [];
