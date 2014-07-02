@@ -150,7 +150,7 @@ var findConnection = function(callbackData, client) {
 
 describe("Game Server",function(){
 
-  it('should sign in on connection (async)', function(done) {
+  it('should sign in on connection', function(done) {
     async.waterfall([
       signInMaker(user1)
       ], 
@@ -175,7 +175,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should fail to create a game when not authenticated (async)', function(done) {
+  it('should fail to create a game when not authenticated', function(done) {
     async.waterfall([
       function(callback) {
         var client = io.connect(socketURL, options);
@@ -195,7 +195,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should fail to join a game when not authenticated (async)', function(done) {
+  it('should fail to join a game when not authenticated', function(done) {
     async.waterfall([
       function(callback) {
         var client = io.connect(socketURL, options);
@@ -215,7 +215,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should fail to join a game whose id does not exist (async)', function(done) {
+  it('should fail to join a game whose id does not exist', function(done) {
     async.waterfall([
       signInMaker(user1),
       function(client, userInfo, callback) {
@@ -240,7 +240,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should be able to create a game (async)', function(done) {
+  it('should be able to create a game', function(done) {
     // verify the data from both callbacks
     var onFinish = function(client, callbackData) {
       if (callbackData['startConfirm'] && callbackData['playerUpdate']) {
@@ -290,7 +290,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should be able to join a game (async)', function(done) {
+  it('should be able to join a game', function(done) {
     var playerUpdates = 0;
     var onFinish = function(client, callbackData) {
       // disconnect all clients
@@ -355,7 +355,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should alert player 1 when the game may be started (async)', function(done) {
+  it('should alert player 1 when the game may be started', function(done) {
     var listeners = {
       'startConfirm': startConfirmDefault,
       'joinConfirm': joinConfirmDefault,
@@ -417,7 +417,7 @@ describe("Game Server",function(){
   });
 */
 
-  it('should not allow game to start when provided an invalid gameid (async)', function(done) {
+  it('should not allow game to start when provided an invalid gameid', function(done) {
     async.waterfall([
       signInMaker(user1),
       function(client, data, callback) {
@@ -441,7 +441,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should not allow game to start when requested by an un-authenticated user (async)', function(done) {
+  it('should not allow game to start when requested by an un-authenticated user', function(done) {
     var client = io.connect(socketURL, options);
     client.emit('requestGameStart', {user: user1, gameId: '123'});
 
@@ -459,7 +459,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should not allow game to start when there are less than 3 players connected (async)', function(done) {
+  it('should not allow game to start when there are less than 3 players connected', function(done) {
     var listeners = {
       'startConfirm': startConfirmDefault,
       'joinConfirm': joinConfirmDefault,
@@ -486,7 +486,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should not allow game to be started by anyone other than the creator of the game (async)', function(done) {
+  it('should not allow game to be started by anyone other than the creator of the game', function(done) {
     var listeners = {
       'startConfirm': startConfirmDefault,
       'joinConfirm': joinConfirmDefault,
@@ -514,7 +514,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should allow a game to be started! (async)', function(done) {
+  it('should allow a game to be started!', function(done) {
     var numWaitingForCards = 0;
     var numStartConfirm = 0;
 
@@ -607,7 +607,7 @@ describe("Game Server",function(){
     });
   });
   
-  it('should prevent card submission when not logged in (async)', function(done) {
+  it('should prevent card submission when not logged in', function(done) {
     async.waterfall([
       function(callback) {
         var client = io.connect(socketURL, options);
@@ -633,7 +633,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should prevent card submission when provided an invalid (or null) gameid (async)', function(done) {
+  it('should prevent card submission when provided an invalid (or null) gameid', function(done) {
     async.waterfall([
       signInMaker(user1),
       function(client, userInfo, callback) {
@@ -659,7 +659,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should prevent card submission when the game is not ready (async)', function(done) {
+  it('should prevent card submission when the game is not ready', function(done) {
     var listeners = {
       'startConfirm': startConfirmDefault,
       'joinConfirm': function(client, userInfo, data, callbackData, key) {
@@ -689,7 +689,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should allow players to submit cards (async)', function(done) {
+  it('should allow players to submit cards', function(done) {
     var numShown = 0;
     var showOrChooseCard = function(client, userInfo, data, callbackData, key) {
       // { cards: [ { type: 'Answer', value: 'My manservant, Claude.' }, { type: 'Answer', value: 'That thing that electrocutes your abs.' } ] }
@@ -751,7 +751,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should prevent players from submitting invalid cards (async)', function(done) {
+  it('should prevent players from submitting invalid cards', function(done) {
     var numWaitingForCards = 0;
     var listeners = {
       'startConfirm': startConfirmDefault,
@@ -797,7 +797,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should prevent a player from submitting multiple cards (async)', function(done) {
+  it('should prevent a player from submitting multiple cards', function(done) {
     var numWaitingForCards = 0;
     var listeners = {
       'startConfirm': startConfirmDefault,
@@ -844,7 +844,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should prevent card choosing when not logged in (async)', function(done) {
+  it('should prevent card choosing when not logged in', function(done) {
     async.waterfall([
       function(callback) {
         var client = io.connect(socketURL, options);
@@ -870,7 +870,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should prevent card choosing when provided an invalid gameid (async)', function(done) {
+  it('should prevent card choosing when provided an invalid gameid', function(done) {
     async.waterfall([
       signInMaker(user1),
       function(client, userInfo, callback) {
@@ -896,7 +896,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should prevent other players from choosing out of turn (async)', function(done) {
+  it('should prevent other players from choosing out of turn', function(done) {
     var listeners = {
       'startConfirm': startConfirmDefault,
       'joinConfirm': joinConfirmDefault,
@@ -932,7 +932,7 @@ describe("Game Server",function(){
     });
   });
   
-  it('should prevent choosing a card that does not exist (async)', function(done) {
+  it('should prevent choosing a card that does not exist', function(done) {
     var listeners = {
       'startConfirm': startConfirmDefault,
       'joinConfirm': joinConfirmDefault,
@@ -968,7 +968,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should prevent choosing when the game is not ready (async)', function(done) {
+  it('should prevent choosing when the game is not ready', function(done) {
     var numWaitingForCards = 0;
     var listeners = {
       'startConfirm': startConfirmDefault,
@@ -1015,7 +1015,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should reward a point for a valid choice (async)', function(done) {
+  it('should reward a point for a valid choice', function(done) {
     var listeners = {
       'startConfirm': startConfirmDefault,
       'joinConfirm': joinConfirmDefault,
@@ -1086,7 +1086,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should prevent requesting a new round when not logged in (async)', function(done) {
+  it('should prevent requesting a new round when not logged in', function(done) {
     async.waterfall([
       function(callback) {
         var client = io.connect(socketURL, options);
@@ -1112,7 +1112,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should prevent requesting a new round when provided an invalid gameid (async)', function(done) {
+  it('should prevent requesting a new round when provided an invalid gameid', function(done) {
     async.waterfall([
       signInMaker(user1),
       function(client, userInfo, callback) {
@@ -1138,7 +1138,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should prevent requesting a new round when the game is not ready (async)', function(done) {
+  it('should prevent requesting a new round when the game is not ready', function(done) {
     var listeners = {
       'startConfirm': startConfirmDefault,
       'joinConfirm': joinConfirmDefault,
@@ -1170,7 +1170,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should prevent other players from starting a new round (async)', function(done) {
+  it('should prevent other players from starting a new round', function(done) {
     var listeners = {
       'startConfirm': startConfirmDefault,
       'joinConfirm': joinConfirmDefault,
@@ -1210,7 +1210,7 @@ describe("Game Server",function(){
     });
   });
 
-  it('should allow the active player to start a new round when the game is ready (async)', function(done) {
+  it('should allow the active player to start a new round when the game is ready', function(done) {
     var listeners = {
       'startConfirm': startConfirmDefault,
       'joinConfirm': joinConfirmDefault,
@@ -1257,7 +1257,7 @@ describe("Game Server",function(){
   });
 
 
-  it('should remove a submitted answer when a player disconnects (async)', function(done) {
+  it('should remove a submitted answer when a player disconnects', function(done) {
     var numWaitingForCards = 0;
     var triggered = false;
     var saw3 = false;
