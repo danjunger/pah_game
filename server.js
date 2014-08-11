@@ -4,18 +4,22 @@ var express = require('express'),
     path = require('path'),
     fs = require('fs'),
     http = require('http'),
-    socketio = require('socket.io');
+    socketio = require('socket.io'),
+    mongoose = require('mongoose');
+
+// Set default node environment to development
+process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+
+var config = require('./lib/config/config');
+
+// Connect to database
+mongoose.connect(config.mongo.uri, config.mongo.options);
 
 var GameServer = require('./lib/game_server/game_server');
 
 /**
  * Main application file
  */
-
-// Set default node environment to development
-process.env.NODE_ENV = process.env.NODE_ENV || 'development';
-
-var config = require('./lib/config/config');
 
 // Bootstrap models
 var modelsPath = path.join(__dirname, 'lib/models');

@@ -6,13 +6,31 @@ describe('Service: Gameclient', function () {
   beforeEach(module('phonesAgainstHumanityApp'));
 
   // instantiate service
-  var Gameclient;
-  beforeEach(inject(function (_Gameclient_) {
-    Gameclient = _Gameclient_;
+  var client;
+  beforeEach(inject(function (_GameClient_) {
+    client = _GameClient_;
   }));
 
+  it('should be able to sign in', function(done) {
+    client.signIn('farts');
+
+    console.log(client.user);
+    console.log(client.user.id);
+
+    setTimeout(function() {
+      console.log(client.user);
+      done();
+    }, 5000);
+  });
+
+  it('takes a long time', function(done) {
+    setTimeout(function() {
+      done();
+    }, 9000);
+  });
+
   it('should do something', function () {
-    expect(!!Gameclient).toBe(true);
+    expect(!!client).toBe(true);
   });
 
 });

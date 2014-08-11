@@ -1,7 +1,12 @@
 'use strict';
 
 angular.module('phonesAgainstHumanityApp')
-  .controller('HomeCtrl', function ($rootScope, $scope, $location, GameClient) {
+  .controller('HomeCtrl', function ($rootScope, $scope, $location, $route, GameClient) {
+    $rootScope.$on('$routeChangeSuccess', function() {
+      $rootScope.pageTitle = $route.current.title;
+    });
+    $rootScope.pageTitle = $route.current.title;
+
     // remove listeners to prevent events from firing more than once!
     $scope.$on('$destroy', function () {
       console.log('calling destroy');

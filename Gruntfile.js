@@ -9,6 +9,9 @@
 
 module.exports = function (grunt) {
 
+  // load selenium
+  grunt.loadNpmTasks('grunt-selenium-webdriver');
+
   // Load grunt tasks automatically
   require('load-grunt-tasks')(grunt);
 
@@ -408,9 +411,34 @@ module.exports = function (grunt) {
       src: ['test/server/**/*.js']
     },
 
+    selenium: {
+      options: {
+        jar: '/usr/local/lib/node_modules/protractor/selenium/selenium-server-standalone-2.42.2.jar',
+        port: 4444
+      },
+    },
+
+    protractor: {
+      options: {
+        configFile: 'protractor.conf.js',
+        keepAlive: false, // If false, the grunt process stops when the test fails.
+        noColor: false, // If true, protractor will not use colors in its output.
+      },
+      chrome: {
+        options: {
+          args: {
+            browser: 'chrome'
+          }
+        }
+      }
+    },
+
     env: {
       test: {
         NODE_ENV: 'test'
+      },
+      prod: {
+        NODE_ENV: 'production'
       }
     }
   });
@@ -466,7 +494,9 @@ module.exports = function (grunt) {
     if (target === 'server') {
       return grunt.task.run([
         'env:test',
-        'mochaTest'
+        'express:dev',
+        'mochaTest',
+        'express:dev:stop'
       ]);
     }
 
@@ -479,9 +509,25 @@ module.exports = function (grunt) {
       ]);
     }
 
+    else if (target === 'e2e') {
+      return grunt.task.run([
+        'clean:server',
+        'concurrent:test',
+        'bower-install',
+        'autoprefixer',
+        'env:prod',
+        'express:prod',
+        'selenium_start',
+        'protractor',
+        'selenium_stop',
+        'express:prod:stop',
+      ]);
+    }
+
     else grunt.task.run([
       'test:server',
-      'test:client'
+      'test:client',
+      'test:e2e'
     ]);
   });
 

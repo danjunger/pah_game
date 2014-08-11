@@ -8,12 +8,14 @@ angular.module('phonesAgainstHumanityApp', [
     $routeProvider
       .when('/', {
         templateUrl: 'partials/home',
-        controller: 'HomeCtrl'
+        controller: 'HomeCtrl',
+        title: 'Sign in to Play'
       })
       .when('/game', {
         templateUrl: 'partials/game',
         controller: 'GameCtrl',
-        reloadOnSearch: false
+        reloadOnSearch: false,
+        title: 'Game in Progress'
       })
       .otherwise({
         redirectTo: '/'

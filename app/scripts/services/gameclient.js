@@ -2,13 +2,13 @@
 
 /**
  * @ngdoc service
- * @name phonesAgainstHumanityApp.Gameclient
+ * @name phonesAgainstHumanityApp.GameClient
  * @description
  * # Gameclient
  * Service in the phonesAgainstHumanityApp.
  */
 angular.module('phonesAgainstHumanityApp')
-  .service('GameClient', function Gameclient(socket) {
+  .service('GameClient', function (socket) {
     // store the ref to the GameClient for use inside socket callbacks
     var client = this;
 

@@ -1276,7 +1276,6 @@ describe("Game Server",function(){
       'cardDrawn': cardDrawnDefault,
       'waitingForCards': function(client, userInfo, data, callbackData, key) {
         // { numPlayers: 2 }
-        try{
         numWaitingForCards++;
 
         // wait until all 4 get the initial callback
@@ -1295,12 +1294,9 @@ describe("Game Server",function(){
               client1.client.disconnect();  
             }, 100);
             
-            //delete callbackData['connections'][findConnection(callbackData, callbackData['yourTurnToAnswer'][0])];
-
             triggered = true;
           }
         }
-      }catch(e){done(e);}
       },
       'chooseCard': function(client, userInfo, data, callbackData, key) {
         if (data.cards.length === 2) {
@@ -1311,6 +1307,60 @@ describe("Game Server",function(){
         }
 
         if (saw2 && saw3) {
+          disconnectAll(callbackData);
+          done();
+        }
+      }
+    };
+
+    async.waterfall([
+      createGameMaker(user1, listeners),
+      joinGameMaker(user2, listeners),
+      joinGameMaker(user3, listeners),
+      joinGameMaker(user4, listeners),
+      ], 
+    function(err, callbackData) {
+    });
+  });
+
+  it('should skip the current round when the choosing player disconnects', function(done) {
+    var numWaitingForCards = 0;
+    var numSkipped = 0;
+    var triggered = false;
+
+    var listeners = {
+      'startConfirm': startConfirmDefault,
+      'joinConfirm': joinConfirmDefault,
+      'gameCanStart': function(client, userInfo, data, callbackData, key) {
+        if (data.players.length === 4) {
+          callbackData['connections'][0].client.emit('requestGameStart', {});
+        }
+      },
+      'yourTurnToChoose': yourTurnToChooseDefault,
+      'yourTurnToAnswer': yourTurnToAnswerDefault,
+      'cardDrawn': cardDrawnDefault,
+      'waitingForCards': function(client, userInfo, data, callbackData, key) {
+        // { numPlayers: 2 }
+        numWaitingForCards++;
+
+        // wait until all 4 get the initial callback
+        if (numWaitingForCards >= 4) {
+          // submit the cards
+          if (data.numPlayers === 3 && !triggered && callbackData['yourTurnToAnswer'].length === 3) {
+            callbackData['yourTurnToChoose'].disconnect();
+
+            //findConnection(callbackData, callbackData['yourTurnToChoose'])
+
+
+            triggered = true;
+          }
+        }
+      },
+      'skipRound': function(client, userInfo, data, callbackData, key) {
+        numSkipped++;
+
+        if (numSkipped === 3) {
+          disconnectAll(callbackData);
           done();
         }
       }

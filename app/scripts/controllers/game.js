@@ -1,11 +1,19 @@
 'use strict';
 
 angular.module('phonesAgainstHumanityApp')
-  .controller('GameCtrl', function ($rootScope, $scope, $location, $timeout, GameClient) {
+  .controller('GameCtrl', function ($rootScope, $scope, $location, $timeout, $route, GameClient) {
     if (!GameClient.user.authenticated) {
+      $rootScope.pageTitle = 'Redirecting to login';
       $timeout(function() {
         $location.path('/');
       }, 2200);
+    }
+
+    $rootScope.$on('$routeChangeSuccess', function() {
+      $rootScope.pageTitle = $route.current.title;
+    });
+    if (GameClient.user.authenticated) {
+      $rootScope.pageTitle = $route.current.title;
     }
 
     $scope.gameService = GameClient;

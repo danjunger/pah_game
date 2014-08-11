@@ -14,9 +14,10 @@ module.exports = function(config) {
       'app/bower_components/angular/angular.js',
       'app/bower_components/angular-mocks/angular-mocks.js',
       'app/bower_components/angular-route/angular-route.js',
+      'app/bower_components/ng-socket-io/ng-socket-io.js',
+      'app/bower_components/socket.io-client/socket.io-client.js',
       'app/scripts/*.js',
       'app/scripts/**/*.js',
-      'test/client/mock/**/*.js',
       'test/client/spec/**/*.js'
     ],
 
