@@ -152,7 +152,7 @@ describe("Game Server",function(){
 
   it('should sign in on connection', function(done) {
     async.waterfall([
-      signInMaker(user1)
+      signInMaker(user1.name)
       ], 
     function(err, client, userInfo) {
       // client id should be the socket id
@@ -179,7 +179,7 @@ describe("Game Server",function(){
     async.waterfall([
       function(callback) {
         var client = io.connect(socketURL, options);
-        client.emit('requestStart', user1);
+        client.emit('requestStart', user1.name);
 
         client.on('startReject', function(data) {
           callback(null, client, data);
@@ -199,7 +199,7 @@ describe("Game Server",function(){
     async.waterfall([
       function(callback) {
         var client = io.connect(socketURL, options);
-        client.emit('requestJoin', {user: user1, gameId: 'asdf'});
+        client.emit('requestJoin', {user: user1.name, gameId: 'asdf'});
 
         client.on('joinReject', function(data) {
           callback(data, client);
@@ -217,9 +217,9 @@ describe("Game Server",function(){
 
   it('should fail to join a game whose id does not exist', function(done) {
     async.waterfall([
-      signInMaker(user1),
+      signInMaker(user1.name),
       function(client, userInfo, callback) {
-        client.emit('requestJoin', {user: user1, gameId: 'asdf'});
+        client.emit('requestJoin', {user: user1.name, gameId: 'asdf'});
 
         client.on('joinReject', function(data) {
           callback(data, client);
@@ -256,7 +256,7 @@ describe("Game Server",function(){
     var listeners = {
       'startConfirm': function(client, userInfo, data, callbackData, key) {
         try {
-          assert.equal(data.id.length, 5);
+          assert.equal(data.id.length, 4);
           assert.equal(data.players.length, 1);
           assert.equal(data.players[0].name, user1.name);
         } catch(e) {
@@ -284,7 +284,7 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners)
+      createGameMaker(user1.name, listeners)
       ], 
     function(err, callbackData) {
     });
@@ -348,8 +348,8 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners)
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners)
       ], 
     function(err, callbackData) {   
     });
@@ -361,7 +361,7 @@ describe("Game Server",function(){
       'joinConfirm': joinConfirmDefault,
       'gameCanStart': function(client, userInfo, data, callbackData, key) {
         try {
-          assert.equal(data.id.length, 5);
+          assert.equal(data.id.length, 4);
           assert.equal(data.players.length > 2, true);
         } catch(e) {
           disconnectAll(callbackData);
@@ -375,9 +375,9 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners)
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners)
       ], 
     function(err, callbackData) {   
     });
@@ -419,7 +419,7 @@ describe("Game Server",function(){
 
   it('should not allow game to start when provided an invalid gameid', function(done) {
     async.waterfall([
-      signInMaker(user1),
+      signInMaker(user1.name),
       function(client, data, callback) {
         client.emit('requestGameStart', {});
 
@@ -443,7 +443,7 @@ describe("Game Server",function(){
 
   it('should not allow game to start when requested by an un-authenticated user', function(done) {
     var client = io.connect(socketURL, options);
-    client.emit('requestGameStart', {user: user1, gameId: '123'});
+    client.emit('requestGameStart', {user: user1.name, gameId: '123'});
 
     client.on('gameStartReject', function(data) {
       try {
@@ -478,8 +478,8 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners)
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners)
       ], 
     function(err, callbackData) {
       callbackData['connections'][0].client.emit('requestGameStart', {});
@@ -505,9 +505,9 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners)
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners)
       ], 
     function(err, callbackData) {
       callbackData['connections'][1].client.emit('requestGameStart', {});
@@ -599,9 +599,9 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners),
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners),
       ], 
     function(err, callbackData) {      
     });
@@ -635,7 +635,7 @@ describe("Game Server",function(){
 
   it('should prevent card submission when provided an invalid (or null) gameid', function(done) {
     async.waterfall([
-      signInMaker(user1),
+      signInMaker(user1.name),
       function(client, userInfo, callback) {
         client.emit('submitCardRequest', {card: { type: 'Answer', value: 'A disappointing birthday party.' }});
 
@@ -682,8 +682,8 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners)
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners)
       ], 
     function(err, callbackData) {
     });
@@ -743,9 +743,9 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners),
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners),
       ], 
     function(err, callbackData) {
     });
@@ -789,9 +789,9 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners),
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners),
       ], 
     function(err, callbackData) {
     });
@@ -836,9 +836,9 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners),
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners),
       ], 
     function(err, callbackData) {
     });
@@ -872,7 +872,7 @@ describe("Game Server",function(){
 
   it('should prevent card choosing when provided an invalid gameid', function(done) {
     async.waterfall([
-      signInMaker(user1),
+      signInMaker(user1.name),
       function(client, userInfo, callback) {
         client.emit('chooseAnswer', {card: { type: 'Answer', value: 'A disappointing birthday party.' }});
 
@@ -924,9 +924,9 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners),
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners),
       ], 
     function(err, callbackData) {
     });
@@ -960,9 +960,9 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners),
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners),
       ], 
     function(err, callbackData) {
     });
@@ -1007,9 +1007,9 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners),
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners),
       ], 
     function(err, callbackData) {
     });
@@ -1078,9 +1078,9 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners),
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners),
       ], 
     function(err, callbackData) {
     });
@@ -1114,7 +1114,7 @@ describe("Game Server",function(){
 
   it('should prevent requesting a new round when provided an invalid gameid', function(done) {
     async.waterfall([
-      signInMaker(user1),
+      signInMaker(user1.name),
       function(client, userInfo, callback) {
         client.emit('requestStartNextRound', null);
 
@@ -1162,9 +1162,9 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners),
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners),
       ], 
     function(err, callbackData) {
     });
@@ -1202,9 +1202,9 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners),
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners),
       ], 
     function(err, callbackData) {
     });
@@ -1248,9 +1248,9 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners),
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners),
       ], 
     function(err, callbackData) {
     });
@@ -1314,10 +1314,10 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners),
-      joinGameMaker(user4, listeners),
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners),
+      joinGameMaker(user4.name, listeners),
       ], 
     function(err, callbackData) {
     });
@@ -1367,10 +1367,10 @@ describe("Game Server",function(){
     };
 
     async.waterfall([
-      createGameMaker(user1, listeners),
-      joinGameMaker(user2, listeners),
-      joinGameMaker(user3, listeners),
-      joinGameMaker(user4, listeners),
+      createGameMaker(user1.name, listeners),
+      joinGameMaker(user2.name, listeners),
+      joinGameMaker(user3.name, listeners),
+      joinGameMaker(user4.name, listeners),
       ], 
     function(err, callbackData) {
     });

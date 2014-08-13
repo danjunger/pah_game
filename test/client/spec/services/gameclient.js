@@ -12,12 +12,12 @@ describe('Service: Gameclient', function () {
   }));
 
   it('should be able to sign in', function(done) {
-    client.signIn('farts');
+    client.signIn('asdf');
 
     console.log(client.user);
     console.log(client.user.id);
 
-    setTimeout(function() {
+    $timeout(function() {
       console.log(client.user);
       done();
     }, 5000);

@@ -1,0 +1,19 @@
+<ion-content>
+  <h1 style="margin-top: 0.5em; margin-bottom: 0.5em;" class="center3 header bold">It's {{client.game.playerTurn.name}}'s turn to pick!</h1>
+
+  <!-- the card being answered -->
+  <div class="card" style="border-color: black;">
+    <div class="item item-text-wrap white_on_black bold">{{client.game.question.value}}</div>
+  </div>
+
+  <h2 class="center3" style="font-size: 1em; margin-top: 3em;" ng-hide="client.game.waitingOnPlayers === 0">Waiting on {{client.game.waitingOnPlayers}} player{{client.game.waitingOnPlayers > 1 ? 's' : ''}}...</h2>
+
+  <!-- the submitted answers -->
+  <div class="card" style="overflow: visible;" ng-repeat="answer in client.game.cardsToChoose track by $index" ng-show="client.game.waitingOnPlayers === 0">
+    <div class="item item-text-wrap black_on_white bold" 
+         ng-hide="client.game.revealedCards[answer.value]">Waiting to be revealed...</div>
+    <div class="item item-text-wrap black_on_white bold" 
+         ng-show="client.game.revealedCards[answer.value]">{{answer.value}}</div>
+  </div>
+
+</ion-content>

@@ -14,7 +14,7 @@ function GameBoard () {
     var that = this;
 
     that.answerpromise = new Promise();
-    fs.readFile('./lib/data/answers.json', {encoding: 'UTF-8'}, function(error, data) {
+    fs.readFile('./server/data/answers.json', {encoding: 'UTF-8'}, function(error, data) {
       if (!error) {
         // resolve promise
         that.answerpromise.resolve();
@@ -28,7 +28,7 @@ function GameBoard () {
     });
 
     that.questionpromise = new Promise();
-    that.question_cards = fs.readFile('./lib/data/questions.json', {encoding: 'UTF-8'}, function(error, data) {
+    that.question_cards = fs.readFile('./server/data/questions.json', {encoding: 'UTF-8'}, function(error, data) {
       if (!error) {
         // resolve promise
         that.questionpromise.resolve();

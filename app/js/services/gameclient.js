@@ -7,13 +7,16 @@
  * # Gameclient
  * Service in the phonesAgainstHumanityApp.
  */
-angular.module('phonesAgainstHumanityApp')
+angular.module('pah.client.GameClient', [])
   .service('GameClient', function (socket) {
     // store the ref to the GameClient for use inside socket callbacks
     var client = this;
 
     this.user = {};
     this.game = {};
+    this.errors = {};
+    this.authenticated = false;
+    this.state = 'authenticate';
 
     this.resetHomeListeners = function() {
       socket.removeAllListeners('signInConfirm');
@@ -43,17 +46,30 @@ angular.module('phonesAgainstHumanityApp')
     // Home page listeners
     socket.on('signInConfirm', function(data) {
       client.user = data;
+      client.errors = {};
+      client.state = 'startjoin';
     });
 
     socket.on('startConfirm', function(data) {
       client.game = {id: data.id, players: data.players};
-      //client.user.gameId = data.id;
+      client.game.revealedCards = {};
+      client.state = 'waitinglist';
     });
 
     socket.on('joinConfirm', function(data) {
       client.game = {id: data.id, players: data.players};
-      //client.user.gameId = data.id;
+      client.game.revealedCards = {};
+      client.state = 'waitinglist';
     });
+
+    socket.on('joinReject', function(data) {
+      client.errors.join = data.error;
+    });
+
+    socket.on('startReject', function(data) {
+      client.errors.start = data.error;
+    });
+    
     // Home page Listeners
 
 
@@ -71,7 +87,6 @@ angular.module('phonesAgainstHumanityApp')
 
     socket.on('playerUpdate', function(data) {
       client.game.players = data.players;
-      console.log(data);
     });
 
     socket.on('cardDrawn', function(data) {
@@ -92,18 +107,21 @@ angular.module('phonesAgainstHumanityApp')
         }
       });
       client.game.submitACard = false;
+      client.state = 'waitingforchooser';
     });
 
     socket.on('yourTurnToChoose', function() {
       client.game.waitingForPlayerCards = true;
       client.game.submitACard = false;
       client.game.startNextRound = false;
+      client.state = 'waitingforplayers';
     });
 
     socket.on('yourTurnToAnswer', function() {
       client.game.waitingForPlayerCards = false;
       client.game.submitACard = true;
       client.game.startNextRound = false;
+      client.state = 'cards';
     });
 
     socket.on('waitingForCards', function(data) {
@@ -130,8 +148,14 @@ angular.module('phonesAgainstHumanityApp')
       client.game.answer = data;
     });
 
+    socket.on('showCards', function(data) {
+      client.game.cardsToChoose = data.cards;
+      client.game.waitingOnPlayers = 0;
+    });
+
     socket.on('scoreUpdate', function(data) {
       client.game.scores = data;
+      client.state = 'scoreupdate';
     });
     
     socket.on('startNextRoundPrompt', function() {
@@ -143,8 +167,14 @@ angular.module('phonesAgainstHumanityApp')
       client.game.question = data.question;
       client.game.playerTurn = data.playerTurn;
       client.game.answer = undefined;
+      client.game.startNextRound = false;
+      client.game.cardsToChoose = undefined;
+      client.game.revealedCards = {};
     });
 
+    socket.on('cardRevealed', function(data) {
+      client.game.revealedCards[data.value] = true;
+    });
     // Game page listeners
 
     // Home page functions
@@ -168,16 +198,26 @@ angular.module('phonesAgainstHumanityApp')
     };
 
     this.submitCard = function(card) {
-      socket.emit('submitCardRequest', {card: JSON.parse(card)});
+      if (typeof card === 'string') {
+        card = JSON.parse(card);
+      }
+      socket.emit('submitCardRequest', {card: card});
     };
         
     this.chooseAnswer = function(card) {
-      socket.emit('chooseAnswer', {card: JSON.parse(card)});
+      if (typeof card === 'string') {
+        card = JSON.parse(card);
+      }
+      socket.emit('chooseAnswer', {card: card});
     };
 
     this.requestStartNextRound = function() {
       socket.emit('requestStartNextRound', null);
     };
+
+    this.revealCard = function(card) {
+      socket.emit('revealCard', card);
+    }
     // Game page functions
 
   });

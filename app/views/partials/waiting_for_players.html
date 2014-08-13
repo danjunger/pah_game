@@ -1,0 +1,38 @@
+<ion-content>
+  <h1 style="margin-top: 0.5em; margin-bottom: 0.5em;" class="center3 header bold">It's your turn to pick!</h1>
+  
+  <!-- the card being answered -->
+  <div class="card" style="border-color: black;">
+    <div class="item item-text-wrap white_on_black bold">{{client.game.question.value}}</div>
+  </div>
+
+  <h2 class="center3" style="font-size: 1em; margin-top: 3em;" ng-hide="client.game.waitingOnPlayers === 0">Waiting on {{client.game.waitingOnPlayers}} player{{client.game.waitingOnPlayers > 1 ? 's' : ''}}...</h2>
+  
+  <!-- the submission box for card 1 -->
+  <div ng-class="{cardSubmission: submission[0].type === 'placeholder'}" ng-show="client.game.waitingOnPlayers === 0"
+       ng-model="submission" data-drop="true" jqyoui-droppable="{multiple:true, onDrop: 'dropSubmitCallBack'}">
+    <div class="card placeholder" ng-model="submission[0]" style="overflow: visible;"
+         data-drag="{{submission[0].type !== 'placeholder'}}" jqyoui-draggable="{animate:true}" data-jqyoui-options="{revert: 'invalid'}"
+         ng-class="{answer_card: submission[0].type !== 'placeholder'}">
+      <div class="item item-text-wrap">
+        {{submission[0].value}}
+      </div>
+    </div>
+  </div>
+
+  <!-- the submit button -->
+  <div ng-show="submission[0].type !== 'placeholder'">
+    <button class="button button-block white_on_black bold" ng-click="submit()">Submit</button>
+  </div>
+
+  <!-- the submitted answers -->
+  <div ng-model="client.game.cardsToChoose" data-drop="true" jqyoui-droppable="{multiple:true, onDrop: 'resetPlaceHolders'}">
+    <div class="card" style="overflow: visible;" ng-repeat="answer in client.game.cardsToChoose track by $index" ng-show="client.game.waitingOnPlayers === 0">
+      <div class="item item-text-wrap black_on_white bold" 
+           ng-hide="answersShown[answer.value]" ng-click="reveal(answer)">Tap to reveal</div>
+      <div class="item item-text-wrap black_on_white bold" 
+           ng-show="answersShown[answer.value]" ng-model="client.game.cardsToChoose" data-drag="true" 
+           jqyoui-draggable="{index: {{$index}},animate:true}" data-jqyoui-options="{revert: 'invalid'}">{{answer.value}}</div>
+    </div>
+  </div>
+</ion-content>

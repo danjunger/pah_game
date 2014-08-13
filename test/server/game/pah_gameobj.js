@@ -1,7 +1,7 @@
 'use strict';
 
 var should = require('should'),
-    PAHGameObj = require('../../../lib/models/pah_gameobj');
+    PAHGameObj = require('../../../server/models/pah_gameobj');
 var assert = require('assert');
 
 describe('PAH_GameObj class', function() {

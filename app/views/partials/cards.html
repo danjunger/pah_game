@@ -1,0 +1,67 @@
+<ion-content>
+
+  <!-- TODO: Add the player's name who is choosing this round -->
+  <h2 style="margin-top: 0.5em; margin-bottom: 0.5em;" class="center3 header bold">It's {{client.game.playerTurn.name}}'s turn to pick!</h2>
+  
+  <!-- the question -->
+  <div class="card question_card">
+    <div class="item item-text-wrap question_card">
+      {{client.game.question.value}}
+    </div>
+  </div>
+
+  <!-- the submission box for card 1 -->
+  <div ng-class="{cardSubmission: submission1[0].type === 'placeholder'}" ng-model="submission1"
+       data-drop="true" jqyoui-droppable="{multiple:true, onDrop: 'dropSubmitCallbackCardOne'}">
+    <div class="card placeholder" ng-model="submission1[0]" style="overflow: visible;"
+         data-drag="{{submission1[0].type !== 'placeholder'}}" jqyoui-draggable="{animate:true}" data-jqyoui-options="{revert: 'invalid'}"
+         ng-class="{answer_card: submission1[0].type !== 'placeholder'}">
+      <div class="item item-text-wrap">
+        {{submission1[0].value}}
+      </div>
+    </div>
+  </div>
+  <!-- the submission box for card 2 -->
+  <div ng-class="{cardSubmission: submission2[0].type === 'placeholder'}" ng-model="submission2" ng-show="submission2" 
+       data-drop="true" jqyoui-droppable="{multiple:true, onDrop: 'dropSubmitCallbackCardTwo'}">
+    <div class="card placeholder" ng-model="submission2[0]" style="overflow: visible;"
+         data-drag="{{submission2[0].type !== 'placeholder'}}" jqyoui-draggable="{animate:true}" data-jqyoui-options="{revert: 'invalid'}"
+         ng-class="{answer_card: submission2[0].type !== 'placeholder'}">
+      <div class="item item-text-wrap">
+        {{submission2[0].value}}
+      </div>
+    </div>
+  </div>
+  <!-- the submission box for card 3 -->
+  <div ng-class="{cardSubmission: submission3[0].type === 'placeholder'}" ng-model="submission3" ng-show="submission3" 
+       data-drop="true" jqyoui-droppable="{multiple:true, onDrop: 'dropSubmitCallbackCardThree'}">
+    <div class="card placeholder" ng-model="submission3[0]" style="overflow: visible;"
+         data-drag="{{submission3[0].type !== 'placeholder'}}" jqyoui-draggable="{animate:true}" data-jqyoui-options="{revert: 'invalid'}"
+         ng-class="{answer_card: submission3[0].type !== 'placeholder'}">
+      <div class="item item-text-wrap">
+        {{submission3[0].value}}
+      </div>
+    </div>
+  </div>
+
+  <div ng-show="submission1[0].type !== 'placeholder' && 
+                (submission2 === undefined ? true : submission2[0].type !== 'placeholder') &&
+                (submission3 === undefined ? true : submission3[0].type !== 'placeholder')">
+    <button class="button button-block white_on_black bold" ng-click="submitCards()">Submit</button>
+  </div>
+  
+  <!-- the player's answer cards -->
+  <div ng-model="client.user.gameObj.hand" data-drop="true" jqyoui-droppable="{multiple:true, onDrop: 'resetPlaceHolders'}">
+    <div class="card answer_card" ng-repeat="card in client.user.gameObj.hand track by $index" ng-model="client.user.gameObj.hand" 
+         data-drag="true" jqyoui-draggable="{index: {{$index}},animate:true}" data-jqyoui-options="{revert: 'invalid'}">
+      <div class="item item-text-wrap">
+        {{card.value}}
+      </div>
+    </div>
+  </div>
+  
+</ion-content>
+
+
+        
+

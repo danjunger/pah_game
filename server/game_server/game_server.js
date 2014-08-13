@@ -19,7 +19,7 @@ function GameServer (socketio) {
     // SIGN ON
     socket.on('signIn', function(data) {
       // data: name
-      var user = new Player(data.name, socket.id);
+      var user = new Player(data, socket.id);
       user.authenticated = true;
       server.users[socket.id] = user;
       socket.emit('signInConfirm', user);
@@ -299,6 +299,27 @@ function GameServer (socketio) {
       // alert the player choosing the next round that they need to click something to advance the game
       var nextPlayer = userGame.getPlayerForTurn();
       server.sockets[nextPlayer.socketId].emit('startNextRoundPrompt', null);
+    });
+
+    socket.on('revealCard', function(data) {
+      // data: {type: 'Answer', value: 'Some clever card'}
+      var user = server.users[socket.id];
+      if (!user) {
+        socket.emit('revealCardReject', {error: 'User not found.'});
+        return;  
+      }
+
+      var userGame = server.findGameById(user.gameId);
+      if (!userGame) {
+        socket.emit('revealCardReject', {error: 'Game not found.'});
+        return;
+      }
+
+      // emit the cardRevealed event to all the other players
+      var otherPlayers = _.without(userGame.players, user);
+      otherPlayers.forEach(function(p) {
+        server.sockets[p.socketId].emit('cardRevealed', data);
+      });
     });
 
     socket.on('requestStartNextRound', function(data) {

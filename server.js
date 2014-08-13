@@ -10,19 +10,19 @@ var express = require('express'),
 // Set default node environment to development
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
-var config = require('./lib/config/config');
+var config = require('./server/config/config');
 
 // Connect to database
 mongoose.connect(config.mongo.uri, config.mongo.options);
 
-var GameServer = require('./lib/game_server/game_server');
+var GameServer = require('./server/game_server/game_server');
 
 /**
  * Main application file
  */
 
 // Bootstrap models
-var modelsPath = path.join(__dirname, 'lib/models');
+var modelsPath = path.join(__dirname, 'server/models');
 fs.readdirSync(modelsPath).forEach(function (file) {
   if (/(.*)\.(js$|coffee$)/.test(file)) {
     require(modelsPath + '/' + file);
@@ -30,12 +30,12 @@ fs.readdirSync(modelsPath).forEach(function (file) {
 });
 
 // Populate empty DB with sample data
-//require('./lib/config/dummydata');
+//require('./server/config/dummydata');
 
 // Setup Express
 var app = express();
-require('./lib/config/express')(app);
-require('./lib/routes')(app);
+require('./server/config/express')(app);
+require('./server/routes')(app);
 
 // Start server
 var appServer = http.createServer(app);

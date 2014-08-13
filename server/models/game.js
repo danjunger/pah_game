@@ -4,7 +4,7 @@ var GameBoard = require('./game_board');
 
 function Game () {
   this.players = [];
-  this.id = randomString({length: 5}).toLowerCase();
+  this.id = randomString({length: 4}).toLowerCase();
   this.game_board = new GameBoard();
   this.currentPlayerTurn = 0;
   this.acceptCards = false;

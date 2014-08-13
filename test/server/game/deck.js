@@ -1,7 +1,7 @@
 'use strict';
 
 var should = require('should'),
-    Deck = require('../../../lib/models/deck');
+    Deck = require('../../../server/models/deck');
 var assert = require('assert');
 
 describe('Deck class', function() {

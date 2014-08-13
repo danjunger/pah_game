@@ -1,0 +1,23 @@
+<ion-content>
+  
+  <!-- show the question and winning answer -->
+  <div class="card">
+    <div class="item item-text-wrap white_on_black bold">{{client.game.question.value}}</div>
+  </div>
+  <div class="card">
+    <div class="item item-text-wrap black_on_white bold">{{client.game.answer.card.value}}</div>
+  </div>
+
+  <h1 class="center3">{{client.game.answer.winner.name}} gets a point!</h1>
+  <h3 class="center3 bold">Scores:</h3>
+  <div class="center3 bold" ng-repeat="player in client.game.scores | orderBy : predicate">
+    <span>{{player.name}}</span>
+    <span>{{player.score}}</span>
+  </div>
+
+  <div>
+    <button class="button button-block white_on_black bold" 
+            ng-show="client.game.startNextRound" ng-click="startNextRound()">Start the next round</button>
+  </div>
+
+</ion-content>

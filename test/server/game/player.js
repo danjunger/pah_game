@@ -1,7 +1,7 @@
 'use strict';
 
 var should = require('should'),
-    Player = require('../../../lib/models/player');
+    Player = require('../../../server/models/player');
 var assert = require('assert');
 
 describe('Player class', function() {

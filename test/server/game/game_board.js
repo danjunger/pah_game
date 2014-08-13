@@ -1,7 +1,7 @@
 'use strict';
 
 var should = require('should'),
-    GameBoard = require('../../../lib/models/game_board');
+    GameBoard = require('../../../server/models/game_board');
 var assert = require('assert');
 var Promise = require('node-promise');
 

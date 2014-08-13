@@ -1,8 +1,8 @@
 'use strict';
 
 var should = require('should');
-var Game = require('../../../lib/models/game');
-var Player = require('../../../lib/models/player');
+var Game = require('../../../server/models/game');
+var Player = require('../../../server/models/player');
 var assert = require('assert');
 
 describe('Game class', function() {
@@ -15,7 +15,7 @@ describe('Game class', function() {
     var testGame = this.testGame;
 
     assert.equal(testGame.players.length, 0);
-    assert.equal(testGame.id.length, 5);
+    assert.equal(testGame.id.length, 4);
     assert.equal(typeof testGame.game_board, 'object');
     assert.equal(testGame.currentPlayerTurn, 0);
   });

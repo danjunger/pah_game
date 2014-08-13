@@ -1,0 +1,10 @@
+<ion-content class="white_on_black">
+  <div class="list">
+    <div class="item item-divider white_on_black bold header" style="text-align:center;">Game ID: {{client.game.id}}</div>
+    <div class="item item-divider white_on_black bold header" style="text-align:center;">Players currently in the game</div>
+    <ul>
+      <li class="item white_on_black bold" ng-repeat="player in client.game.players">{{player.name}}</li>
+    </ul>
+  </div>
+  <button class="button button-block black_on_white bold" ng-show="client.game.canStart" ng-click="startGame()">Start the game!</button>
+</ion-content>
