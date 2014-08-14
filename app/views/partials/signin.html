@@ -16,13 +16,13 @@
       <input type="password" ng-model="user.password" maxlength="30" size="15" class="join_input">
       <div ng-show="error" style="color: red;">Error: {{error}}</div>
       <div style="text-align: center;">
-        <button class="join_button" ng-click="signIn()">Sign in</button>
+        <button class="join_button black_on_white" ng-click="signIn()">Sign in</button>
         <p style="margin-top: 1em;">Not registered yet?</p>
       </div>
     </form>
 
     <div style="text-align: center;">
-      <button class="join_button" ng-show="showSignUp" ng-click="toggleSignUp()">Sign up!</button>
+      <button class="join_button black_on_white" ng-show="showSignUp" ng-click="toggleSignUp()">Sign up!</button>
       <div ng-show="!showSignUp">Create an account</div>
       <form ng-show="!showSignUp" class="sign_up_form">
         <div>
@@ -32,8 +32,8 @@
           Password<input ng-model="user.password" type="password" maxlength="30" size="15" class="join_input">
         </div>
         <div class="center" style="display: inline; margin-top: 2em;">
-          <button class="join_button" ng-click="toggleSignUp()">Cancel</button>
-          <button class="join_button" ng-click="signUp()">Submit</button>
+          <button class="join_button black_on_white" ng-click="toggleSignUp()">Cancel</button>
+          <button class="join_button black_on_white" ng-click="signUp()">Submit</button>
         </div>
         <div ng-show="registerError" style="color: red;">Error: {{registerError}}</div>
       </form>

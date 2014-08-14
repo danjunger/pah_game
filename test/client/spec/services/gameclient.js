@@ -16,11 +16,13 @@ describe('Service: Gameclient', function () {
 
     console.log(client.user);
     console.log(client.user.id);
-
+/*
     $timeout(function() {
       console.log(client.user);
       done();
     }, 5000);
+*/
+    done();
   });
 
   it('takes a long time', function(done) {

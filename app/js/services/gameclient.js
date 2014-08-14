@@ -8,7 +8,7 @@
  * Service in the phonesAgainstHumanityApp.
  */
 angular.module('pah.client.GameClient', [])
-  .service('GameClient', function (socket) {
+  .service('GameClient', ['socket', function (socket) {
     // store the ref to the GameClient for use inside socket callbacks
     var client = this;
 
@@ -220,4 +220,4 @@ angular.module('pah.client.GameClient', [])
     }
     // Game page functions
 
-  });
+  }]);

@@ -129,7 +129,8 @@ module.exports = function (grunt) {
             '.tmp',
             '<%= yeoman.dist %>/*',
             '!<%= yeoman.dist %>/.git*',
-            '!<%= yeoman.dist %>/Procfile'
+            '!<%= yeoman.dist %>/Procfile',
+            '!<%= yeoman.dist %>/.env'
           ]
         }]
       },
@@ -275,7 +276,7 @@ module.exports = function (grunt) {
         files: [{
           expand: true,
           cwd: '<%= yeoman.app %>/views',
-          src: ['*.html', 'partials/**/*.html'],
+          src: ['*.html'],
           dest: '<%= yeoman.dist %>/views'
         }]
       }
@@ -321,7 +322,7 @@ module.exports = function (grunt) {
           dot: true,
           cwd: '<%= yeoman.app %>/views',
           dest: '<%= yeoman.dist %>/views',
-          src: '**/*.jade'
+          src: ['index.html','404.html']
         }, {
           expand: true,
           cwd: '.tmp/images',
@@ -342,6 +343,12 @@ module.exports = function (grunt) {
         cwd: '<%= yeoman.app %>/styles',
         dest: '.tmp/styles/',
         src: '{,*/}*.css'
+      },
+      copyviews: {
+        expand: true,
+        cwd: '<%= yeoman.app %>/views',
+        dest: '<%= yeoman.dist %>/public/views',
+        src: ['partials/*']
       }
     },
 
@@ -366,7 +373,8 @@ module.exports = function (grunt) {
         'copy:styles',
         'imagemin',
         'svgmin',
-        'htmlmin'
+        'htmlmin',
+        'copy:copyviews'
       ]
     },
 
@@ -518,7 +526,7 @@ module.exports = function (grunt) {
         'env:prod',
         'express:prod',
         'selenium_start',
-        'protractor',
+        //'protractor',
         'selenium_stop',
         'express:prod:stop',
       ]);

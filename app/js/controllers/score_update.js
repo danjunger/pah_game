@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('pah.client.ScoreUpdateCtrl', [])
-  .controller('ScoreUpdateCtrl', function ($scope, $location, GameClient) {
+  .controller('ScoreUpdateCtrl', ['$scope', '$location', 'GameClient', function ($scope, $location, GameClient) {
     $scope.client = GameClient;
     $scope.predicate = '-score';
 
@@ -20,4 +20,4 @@ angular.module('pah.client.ScoreUpdateCtrl', [])
         $location.path('/cards');
       }
     }, true);
-  });
+  }]);

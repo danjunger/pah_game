@@ -23,7 +23,7 @@ module.exports = function(app) {
 
     // Disable caching of scripts for easier testing
     app.use(function noCache(req, res, next) {
-      if (req.url.indexOf('/scripts/') === 0) {
+      if (req.url.indexOf('/js/') === 0) {
         res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.header('Pragma', 'no-cache');
         res.header('Expires', 0);

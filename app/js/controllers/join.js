@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('pah.client.JoinCtrl', [])
-  .controller('JoinCtrl', function ($scope, $location, GameClient) {
+  .controller('JoinCtrl', ['$scope', '$location', 'GameClient', function ($scope, $location, GameClient) {
     $scope.showJoinForm = false;
     $scope.models = {};
     $scope.client = GameClient;
@@ -28,4 +28,4 @@ angular.module('pah.client.JoinCtrl', [])
       }
     }, true);
 
-  });
+  }]);

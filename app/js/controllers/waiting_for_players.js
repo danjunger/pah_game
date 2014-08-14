@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('pah.client.WaitingForPlayersCtrl', [])
-  .controller('WaitingForPlayersCtrl', function ($scope, $location, GameClient) {
+  .controller('WaitingForPlayersCtrl', ['$scope', '$location', 'GameClient', function ($scope, $location, GameClient) {
     $scope.client = GameClient; 
 
     $scope.submission = [{'type': 'placeholder', 'value': 'Drag your choice here'}];
@@ -63,4 +63,4 @@ angular.module('pah.client.WaitingForPlayersCtrl', [])
       }
     }, true);
     
-  });
+  }]);

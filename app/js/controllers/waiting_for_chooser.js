@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('pah.client.WaitingForChooserCtrl', [])
-  .controller('WaitingForChooserCtrl', function ($scope, GameClient, $location, $timeout) {
+  .controller('WaitingForChooserCtrl', ['$scope', '$location', 'GameClient', function ($scope, $location, GameClient) {
     $scope.client = GameClient;
 
     // get an object of the same size with all false values initially
@@ -30,14 +30,5 @@ angular.module('pah.client.WaitingForChooserCtrl', [])
       }
     }, true);
 
-    // simulate the revealing
-    $timeout(function() {
-      if ($scope.client.game.cardsToChoose) {
-        for (var i = 0; i < $scope.client.game.cardsToChoose.length; i++) {
-          $scope.reveal($scope.client.game.cardsToChoose[i].value);  
-        }
-      }
-    }, 2000);
 
-
-  });
+  }]);

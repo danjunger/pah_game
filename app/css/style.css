@@ -222,3 +222,28 @@
   color: red;
   font-size: 0.35em;
 }
+
+.startgameTranslate {
+  -webkit-transform: translate(0, 550%);
+  transform: translate(0, 550%);
+}
+
+.startgameTranslateShifted {
+  -webkit-transform: translate(0, 220%);
+  transform: translate(0, 220%);
+}
+
+.joingameTranslate {
+  -webkit-transform: translate(0, 162%);
+  transform: translate(0, 162%);
+}
+
+.joingameTranslateShifted {
+  -webkit-transform: translate(0, 125%);
+  transform: translate(0, 125%);
+}
+
+.joingameTranslate div {
+  -webkit-transform: translate(0, 50%);
+  transform: translate(0, 50%);
+}

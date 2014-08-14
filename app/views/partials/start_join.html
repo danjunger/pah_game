@@ -3,22 +3,24 @@
   <div style="display:table !important; text-align: center;" class="fullpage">
 
     <div style="display: table-row !important; cursor: pointer;" class="white_on_black join_font" ng-click="startGame()">
-      <div style="transform: translateY({{client.errors.start ? 220 : 550}}%)">
+      <div class="startgameTranslate"
+           ng-class="{startgameTranslateShifted: client.errors.start}">
           <p>Start a Game</p>
           <p class="error_default" ng-show="client.errors.start">{{client.errors.start}}</p>
       </div>
     </div>
 
     <div style="display: table-row !important;  cursor: pointer; height: 50%;" class="black_on_white join_font" ng-if="!showJoinForm" ng-click="toggleJoinForm()">
-      <div style="transform: translateY(550%)" ng-click="toggleJoinForm()">
+      <div class="startgameTranslate" ng-click="toggleJoinForm()">
           <p>Join a Game</p>
       </div>
     </div>
 
     <div style="display: table-row !important; height: 50%;" class="black_on_white join_font" ng-if="showJoinForm">
-      <div style="transform: translateY({{client.errors.join ? 125 : 162}}%)">
+      <div class="joingameTranslate"
+           ng-class="{joingameTranslateShifted: client.errors.join}">
           <p>Join a Game</p>
-          <div style="transform: translateY(50%)">
+          <div>
             <input type="text" ng-model="models.gameId" maxlength="10" size="15" placeholder=" Enter game id" class="join_input">
             <button class="join_button" ng-click="joinGame()">Join!</button>
             <p class="error_default" ng-show="client.errors.join">{{client.errors.join}}</p>

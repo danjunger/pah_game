@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('pah.client.CardCtrl', [])
-  .controller('CardsCtrl', function ($scope, $location, GameClient) {
+  .controller('CardsCtrl', ['$scope', '$location', 'GameClient', function ($scope, $location, GameClient) {
     $scope.client = GameClient;
 
 
@@ -94,4 +94,4 @@ angular.module('pah.client.CardCtrl', [])
       }
     }, true);
 
-  });
+  }]);

@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('pah.client.WaitingListCtrl', [])
-  .controller('WaitingListCtrl', function ($scope, $location, GameClient) {
+  .controller('WaitingListCtrl', ['$scope', '$location', 'GameClient', function ($scope, $location, GameClient) {
     $scope.client = GameClient;
 
     $scope.startGame = function() {
@@ -20,4 +20,4 @@ angular.module('pah.client.WaitingListCtrl', [])
       }
     }, true);
 
-  });
+  }]);

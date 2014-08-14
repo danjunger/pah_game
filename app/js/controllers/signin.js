@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('pah.client.SignInCtrl', [])
-  .controller('SignInCtrl', function ($scope, $http, $location, GameClient) {
+  .controller('SignInCtrl', ['$scope', '$http', '$location', 'GameClient', function ($scope, $http, $location, GameClient) {
     $scope.showSignUp = true;
     $scope.user = {};
 
@@ -37,4 +37,4 @@ angular.module('pah.client.SignInCtrl', [])
       registerPromise.then(registerSuccess, registerFail);
     };
 
-  });
+  }]);
