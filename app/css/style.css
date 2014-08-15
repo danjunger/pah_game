@@ -159,6 +159,14 @@
   margin: 1em;
 }
 
+.sign_up_form input.ng-invalid.ng-dirty {
+  background-color: #FA787E;
+}
+
+.sign_up_form input.ng-valid.ng-dirty {
+  background-color: #78FA89;
+}
+
 #startjoinpage .scroll {
   height: 100% !important;
   width: 100% !important;
@@ -246,4 +254,8 @@
 .joingameTranslate div {
   -webkit-transform: translate(0, 50%);
   transform: translate(0, 50%);
+}
+
+.opaque {
+  opacity: 0.65;
 }

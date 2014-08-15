@@ -9,14 +9,15 @@
   </div>
 
   <div class="center" style="margin-top: 3em;">
-    <form class="sign_up_form" ng-show="showSignUp">
-      <div style="width: 100%;">Email</div>
-      <input type="text" ng-model="user.username" maxlength="30" size="15" class="join_input">
+    <form name="signinform" class="sign_up_form" ng-show="showSignUp" novalidate>
+      <div style="width: 100%;">User Name</div>
+      <input type="text" ng-model="user.username" maxlength="30" size="15" class="join_input" required>
       <div>Password</div>
-      <input type="password" ng-model="user.password" maxlength="30" size="15" class="join_input">
+      <input type="password" ng-model="user.password" maxlength="30" size="15" class="join_input" required>
       <div ng-show="error" style="color: red;">Error: {{error}}</div>
       <div style="text-align: center;">
-        <button class="join_button black_on_white" ng-click="signIn()">Sign in</button>
+        <button ng-disabled="signinform.$invalid" ng-click="signIn()" 
+                class="join_button black_on_white" ng-class="{opaque: signinform.$invalid}">Sign in</button>
         <p style="margin-top: 1em;">Not registered yet?</p>
       </div>
     </form>
@@ -24,16 +25,20 @@
     <div style="text-align: center;">
       <button class="join_button black_on_white" ng-show="showSignUp" ng-click="toggleSignUp()">Sign up!</button>
       <div ng-show="!showSignUp">Create an account</div>
-      <form ng-show="!showSignUp" class="sign_up_form">
+      <form name="signupform" ng-show="!showSignUp" class="sign_up_form" novalidate>
         <div>
-          Email<input ng-model="user.username" type="email" maxlength="30" size="15" class="join_input">
+          User Name<input ng-model="user.username" type="text" maxlength="30" size="15" class="join_input" required>
         </div>
         <div>
-          Password<input ng-model="user.password" type="password" maxlength="30" size="15" class="join_input">
+          Email<input ng-model="user.email" type="email" maxlength="30" size="15" class="join_input" required>
+        </div>
+        <div>
+          Password<input ng-model="user.password" type="password" maxlength="30" size="15" class="join_input" required>
         </div>
         <div class="center" style="display: inline; margin-top: 2em;">
           <button class="join_button black_on_white" ng-click="toggleSignUp()">Cancel</button>
-          <button class="join_button black_on_white" ng-click="signUp()">Submit</button>
+          <button ng-disabled="signupform.$invalid" ng-click="signUp()" 
+                  class="join_button black_on_white" ng-class="{opaque: signupform.$invalid}">Submit</button>
         </div>
         <div ng-show="registerError" style="color: red;">Error: {{registerError}}</div>
       </form>

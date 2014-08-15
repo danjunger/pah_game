@@ -11,7 +11,7 @@ angular.module('pah.client.SignInCtrl', [])
 
     $scope.signIn = function() {
       $scope.error = undefined;
-      var authPromise = $http.post('auth/local', {email: $scope.user.username, password: $scope.user.password});        
+      var authPromise = $http.post('auth/local', {username: $scope.user.username, password: $scope.user.password});        
       var authSuccess = function(data) {
         GameClient.authenticated = data.token;
         GameClient.signIn($scope.user.username);
@@ -26,7 +26,7 @@ angular.module('pah.client.SignInCtrl', [])
 
     $scope.signUp = function() {
       $scope.registerError = undefined;
-      var registerPromise = $http.post('api/users/', {email: $scope.user.username, password: $scope.user.password});        
+      var registerPromise = $http.post('api/users/', {username: $scope.user.username, email: $scope.user.email, password: $scope.user.password});        
       var registerSuccess = function(data) {
         $scope.signIn();
       };

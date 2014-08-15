@@ -10,7 +10,8 @@ var express = require('express'),
     session = require('express-session'),
     errorHandler = require('errorhandler'),
     path = require('path'),
-    config = require('./config');
+    config = require('./config'),
+    passport = require('passport');
 
 /**
  * Express configuration
@@ -48,6 +49,12 @@ module.exports = function(app) {
   app.use(morgan('dev'));
   app.use(bodyParser());
   app.use(methodOverride());
+
+  // session stuff
+  app.use(cookieParser('your secret here'));
+  app.use(session());
+  app.use(passport.initialize());
+  app.use(passport.session());
 
   // Error handler - has to be last
   if ('development' === app.get('env')) {
