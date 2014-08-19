@@ -1,9 +1,12 @@
 var _ = require('underscore');
 var Game = require('../models/game');
 var Player = require('../models/player');
+var Session = require('../models/session/session.model');
+
 
 function GameServer (socketio) {
   var server = this;
+  var socketTimeoutDelay = 1000 * 30; // 30 sec
 
   server.users = [];
   server.games = [];
@@ -16,10 +19,82 @@ function GameServer (socketio) {
     console.log('A new client has connected. This is connection ' + socket.id);
     server.sockets[socket.id] = socket;
 
+    // prompt the client for a session token
+    socket.emit('sessionLookup', null);
+
+    // listen for a sessionLookResponse event
+    socket.on('sessionLookResponse', function(data) {
+      var sessionId = data.token;
+      var existingSession;
+console.log('looking up session ', data.token);
+      Session.findOne({token: data.token}, function(err, session) {
+        if (err) {
+          console.log('blew up looking for session in lookup');
+        }
+        // session found, update it and update the references to its socket
+        else if (session) {
+          var oldSocketId = session.socketId;
+
+          // save the new socketId in the session
+          session.socketId = socket.id;
+          session.save(function(err, session) {
+            if (err) {
+              console.log('blew up saving the session with the socketid in lookup');
+            }
+            else {
+              console.log('saved session in lookup');
+            }
+          });
+
+          // if the old socket is still connected, disconnect it
+          if (server.sockets[oldSocketId]) {
+            server.sockets[oldSocketId].disconnect();
+
+            // and delete its ref in the socket list
+            delete server.sockets[oldSocketId];
+          }
+
+          // update references to the old socket...
+
+          // if the old socket exists in the game server
+          if (server.users[oldSocketId]) {
+            // update socketId in player object
+            server.users[oldSocketId].socketId = socket.id;
+
+            // update server.users to point to the new socketId
+            server.users[socket.id] = server.users[oldSocketId];
+
+            // cleanup user and socket objects from the disconnected user
+            delete server.users[oldSocketId];
+          }
+        }
+      });
+    });
+
     // SIGN ON
     socket.on('signIn', function(data) {
       // data: name
-      var user = new Player(data, socket.id);
+      var user = new Player(data.username, socket.id);
+      
+      // add the socket.id into the DB session object
+      Session.findOne({username: data.username}, function(err, session) {
+        if (err) {
+          console.log('blew up looking for session');
+        }
+        else {
+          console.log('found session');
+          session.socketId = socket.id;
+          session.save(function(err, session) {
+            if (err) {
+              console.log('blew up saving the session with the socketid');
+            }
+            else {
+              console.log('saved session');
+            }
+          });
+        }
+      });
+
       user.authenticated = true;
       server.users[socket.id] = user;
       socket.emit('signInConfirm', user);
@@ -381,82 +456,108 @@ function GameServer (socketio) {
       console.log('Connection ' + socket.id + ' has been disconnected.');
       var user = server.users[socket.id];
 
-      // remove user from any game they might be in
-      if (user && user.gameId && user.gameId !== 0) {
-        var game = server.games[user.gameId];
-        var currentPlayerForTurn = game.getPlayerForTurn();
-        game.removePlayer(user);
-
-        // it is the user who left turn
-        if (user === currentPlayerForTurn) {
-          // enough players to continue
-          if (game.players.length > 2) {
-            // advance the game to the next round
-            game.nextTurn();
-
-            // set the game able to start a new round
-            game.canStartNextRound = true;
-
-            // alert the players that this round is being skipped
-            game.players.forEach(function(p) {
-              server.sockets[p.socketId].emit('skipRound', null);
-            });
-
-            // alert the player choosing the next round that they need to click something to advance the game
-            var nextPlayer = game.getPlayerForTurn();
-            server.sockets[nextPlayer.socketId].emit('startNextRoundPrompt', null);
-          }
-          // not enough players to continue
-          else {
-  console.log('player turn left, not enough to continue');
-          }
-        }
-        // not this user's turn
-        else {
-          // enough players to continue, retract the players card if submitted
-          if (game.players.length > 2) {
-            var departingPlayerCardIndex = -1;
-            for (var i = 0; i < game.game_board.answers.length; i++) {
-              if (game.game_board.answers[i].player === user) {
-                departingPlayerCardIndex = i;
-                break;
-              }
-            }
-            // if the index exists (card found), splice it out
-            if (departingPlayerCardIndex !== -1) {
-              game.game_board.answers.splice(departingPlayerCardIndex, 1);
-
-              var cardsToShow = game.game_board.answers.map(function(item) {
-                return item.card;
-              });
-
-              // check that the game is ready for a choice prior to sending an updated list
-              if (game.acceptChoice) {
-              // send the chooser the updated list of cards.
-                server.sockets[game.getPlayerForTurn().socketId].emit('chooseCard', {cards: cardsToShow});
-              }
-            }
-          }
-          // not enough players to continue, start a new round and wait for more players
-          else {
-  console.log('player left, not enough to continue');
-            
-          }
-        }
-
-        // delete the game when the last player leaves
-        if (game.players.length === 0) {
-          delete server.games[user.gameId];
-        }
-        // game not empty, broadcast an update to the players who are still connected
-        else {
-          server.updatePlayers(user.gameId);
-        }
+      // mark the user as disconnected if it was logged in
+      if (user) {
+        user.disconnected = true;
       }
 
-      // cleanup user and socket objects from the disconnected user
-      delete server.users[this.id];
-      delete server.sockets[this.id];
+      // set a timer to remove the socket references
+      setTimeout(function() {
+console.log('cleaning up old socket references for ' + socket.id);
+
+        // check the socketId reference on the user to see if they have reconnected with a new socketid
+
+        // user has a new socket id, dont wipe their game, just remove the old socketid
+        if (user && user.socketId !== socket.id) {
+          console.log('user for socket %s has returned, nothing to do', socket.id);
+        }
+
+        // user did not reconnect, wipe them out
+        else {
+          console.log('user for socket %s did not return, cleaning up', socket.id);
+
+        // remove user from any game they might be in
+          if (user && user.gameId && user.gameId !== 0) {
+            var game = server.games[user.gameId];
+            var currentPlayerForTurn = game.getPlayerForTurn();
+            game.removePlayer(user);
+
+            // it is the user who left turn
+            if (user === currentPlayerForTurn) {
+              // enough players to continue
+              if (game.players.length > 2) {
+                // advance the game to the next round
+                game.nextTurn();
+
+                // set the game able to start a new round
+                game.canStartNextRound = true;
+
+                // alert the players that this round is being skipped
+                game.players.forEach(function(p) {
+                  server.sockets[p.socketId].emit('skipRound', null);
+                });
+
+                // alert the player choosing the next round that they need to click something to advance the game
+                var nextPlayer = game.getPlayerForTurn();
+                server.sockets[nextPlayer.socketId].emit('startNextRoundPrompt', null);
+              }
+              // not enough players to continue
+              else {
+      console.log('player turn left, not enough to continue');
+              }
+            }
+            // not this user's turn
+            else {
+              // enough players to continue, retract the players card if submitted
+              if (game.players.length > 2) {
+                var departingPlayerCardIndex = -1;
+                for (var i = 0; i < game.game_board.answers.length; i++) {
+                  if (game.game_board.answers[i].player === user) {
+                    departingPlayerCardIndex = i;
+                    break;
+                  }
+                }
+                // if the index exists (card found), splice it out
+                if (departingPlayerCardIndex !== -1) {
+                  game.game_board.answers.splice(departingPlayerCardIndex, 1);
+
+                  var cardsToShow = game.game_board.answers.map(function(item) {
+                    return item.card;
+                  });
+
+                  // check that the game is ready for a choice prior to sending an updated list
+                  if (game.acceptChoice) {
+                  // send the chooser the updated list of cards.
+                    server.sockets[game.getPlayerForTurn().socketId].emit('chooseCard', {cards: cardsToShow});
+                  }
+                }
+              }
+              // not enough players to continue, start a new round and wait for more players
+              else {
+      console.log('player left, not enough to continue');
+                
+              }
+            }
+
+            // delete the game when the last player leaves
+            if (game.players.length === 0) {
+              delete server.games[user.gameId];
+            }
+            // game not empty, broadcast an update to the players who are still connected
+            else {
+              server.updatePlayers(user.gameId);
+            }
+          }
+
+          // cleanup user and socket objects from the disconnected user
+          delete server.users[socket.id];
+          delete server.sockets[socket.id];
+
+        }
+
+      }, socketTimeoutDelay);
+
+
     });
     // DISCONNECTION //
   });

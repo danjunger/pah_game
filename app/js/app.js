@@ -8,7 +8,7 @@
 
 angular.module('PAHClient', [
   // libraries
-  'ionic', 'socket-io', 'ngDragDrop',
+  'ionic', 'socket-io', 'ngDragDrop', 'ngCookies',
 
   // project code
   'pah.client.GameClient', 'pah.client.SignInCtrl',

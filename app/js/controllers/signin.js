@@ -1,9 +1,10 @@
 'use strict';
 
 angular.module('pah.client.SignInCtrl', [])
-  .controller('SignInCtrl', ['$scope', '$http', '$location', 'GameClient', function ($scope, $http, $location, GameClient) {
+  .controller('SignInCtrl', ['$scope', '$http', '$location', '$cookies', 'GameClient', function ($scope, $http, $location, $cookies, GameClient) {
     $scope.showSignUp = true;
     $scope.user = {};
+    $scope.client = GameClient;
 
     $scope.toggleSignUp = function() {
       $scope.showSignUp = !$scope.showSignUp;
@@ -13,9 +14,11 @@ angular.module('pah.client.SignInCtrl', [])
       $scope.error = undefined;
       var authPromise = $http.post('auth/local', {username: $scope.user.username, password: $scope.user.password});        
       var authSuccess = function(data) {
-        GameClient.authenticated = data.token;
-        GameClient.signIn($scope.user.username);
+        $scope.client.authenticated = data.data.token;
+        $scope.client.signIn($scope.user.username, $scope.client.authenticated);
         $location.path('/join');
+        $cookies.token = data.data.token;
+
       };
       var authFail = function(data) {
         $scope.error = data.data.message;

@@ -22,15 +22,17 @@ var GameServer = require('./server/game_server/game_server');
  */
 
 // Bootstrap models
+/*
 var modelsPath = path.join(__dirname, 'server/models');
 fs.readdirSync(modelsPath).forEach(function (file) {
   if (/(.*)\.(js$|coffee$)/.test(file)) {
     require(modelsPath + '/' + file);
   }
 });
+*/
 
-// Populate empty DB with sample data
-//require('./server/config/dummydata');
+// Initialize DB: populate DB if empty, clear transient data
+require('./server/config/dbinit');
 
 // Setup Express
 var app = express();

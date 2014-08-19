@@ -1,10 +1,12 @@
 'use strict';
 
 angular.module('pah.client.JoinCtrl', [])
-  .controller('JoinCtrl', ['$scope', '$location', 'GameClient', function ($scope, $location, GameClient) {
+  .controller('JoinCtrl', ['$scope', '$location', '$cookies', 'GameClient', function ($scope, $location, $cookies, GameClient) {
     $scope.showJoinForm = false;
     $scope.models = {};
     $scope.client = GameClient;
+
+    console.log($cookies);
 
     $scope.toggleJoinForm = function() {
       $scope.showJoinForm = !$scope.showJoinForm;

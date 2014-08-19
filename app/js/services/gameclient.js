@@ -8,7 +8,7 @@
  * Service in the phonesAgainstHumanityApp.
  */
 angular.module('pah.client.GameClient', [])
-  .service('GameClient', ['socket', function (socket) {
+  .service('GameClient', ['socket', '$cookies', function (socket, $cookies) {
     // store the ref to the GameClient for use inside socket callbacks
     var client = this;
 
@@ -68,6 +68,10 @@ angular.module('pah.client.GameClient', [])
 
     socket.on('startReject', function(data) {
       client.errors.start = data.error;
+    });
+
+    socket.on('disconnect', function() {
+      client.disconnected = true;
     });
     
     // Home page Listeners
@@ -175,11 +179,19 @@ angular.module('pah.client.GameClient', [])
     socket.on('cardRevealed', function(data) {
       client.game.revealedCards[data.value] = true;
     });
+
+    socket.on('sessionLookup', function() {
+      console.log('session lookup', $cookies.token);
+      if ($cookies.token) {
+        console.log('looking up session ', $cookies.token);
+        socket.emit('sessionLookResponse', {token: $cookies.token});
+      }
+    });
     // Game page listeners
 
     // Home page functions
-    this.signIn = function(username) {
-      socket.emit('signIn', username);
+    this.signIn = function(username, token) {
+      socket.emit('signIn', {username: username, token: token});
     };
 
     this.startGame = function() {
